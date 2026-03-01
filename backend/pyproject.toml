@@ -41,6 +41,18 @@ dependencies = [
     # 모니터링
     "langfuse>=2.55",
 
+    # NLP
+    "nltk>=3.9.1",
+
+    # 문서 변환
+    "pypdf>=6.0",
+    "python-docx>=1.1",
+    "markdown-it-py>=3.0",
+    "mdit_plain>=1.0",
+
+    # 디렉토리 감시
+    "watchdog>=6.0",
+
     # 유틸리티
     "pydantic-settings>=2.7",
     "python-dotenv>=1.0",

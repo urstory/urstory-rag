@@ -15,7 +15,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://localhost:3100}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
     depends_on:
       rag-redis:
         condition: service_healthy
@@ -35,8 +35,111 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # --- Langfuse v3 ---
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: rag-langfuse-web
+    ports:
+      - "3100:3000"
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme_strong_password}@shared-postgres:5432/${POSTGRES_DB:-shared}
+      NEXTAUTH_URL: http://localhost:3100
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-changeme_nextauth_secret}
+      SALT: ${SALT:-changeme_salt_string}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      # ClickHouse
+      CLICKHOUSE_URL: http://rag-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://rag-clickhouse:9000
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      # Redis (Langfuse 전용)
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-langfuseredis}
+      # MinIO (S3 호환 스토리지)
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+    depends_on:
+      rag-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    networks:
+      - default
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    container_name: rag-langfuse-worker
+    environment:
+      <<: *langfuse-env
+    depends_on:
+      rag-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    networks:
+      - default
+    restart: unless-stopped
+
+  rag-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: rag-clickhouse
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: redis:7-alpine
+    container_name: langfuse-redis
+    command: redis-server --requirepass ${LANGFUSE_REDIS_AUTH:-langfuseredis}
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${LANGFUSE_REDIS_AUTH:-langfuseredis}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-minio:
+    image: minio/minio:latest
+    container_name: langfuse-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   redis_data:
+  clickhouse_data:
+  langfuse_redis_data:
+  langfuse_minio_data:
 
 networks:
   default:

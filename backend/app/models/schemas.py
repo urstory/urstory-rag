@@ -34,6 +34,7 @@ class SearchRequest(BaseModel):
     search_mode: str | None = None
     hyde_enabled: bool | None = None
     reranking_enabled: bool | None = None
+    generate_answer: bool = True
 
 
 class SearchResult(BaseModel):
@@ -55,10 +56,24 @@ class PipelineStep(BaseModel):
     passed: bool
     duration_ms: float
     results_count: int | None = None
+    detail: dict | None = None
+
+
+class SearchPipelineResult(BaseModel):
+    """하이브리드 검색 오케스트레이터의 반환 타입."""
+    documents: list[SearchResult]
+    answer: str | None = None
+    trace: list[PipelineStep] = []
 
 
 class DebugSearchResponse(SearchResponse):
     pipeline_trace: list[PipelineStep]
+
+
+class GuardrailsSettingsResponse(BaseModel):
+    pii_detection: dict
+    injection_detection: dict
+    hallucination_detection: dict
 
 
 class SettingsResponse(BaseModel):
@@ -78,6 +93,7 @@ class SettingsResponse(BaseModel):
     retriever_top_k: int
     hyde_enabled: bool
     hyde_model: str
+    guardrails: GuardrailsSettingsResponse
     pii_detection_enabled: bool
     injection_detection_enabled: bool
     hallucination_detection_enabled: bool
@@ -103,6 +119,7 @@ class SettingsUpdateRequest(BaseModel):
     retriever_top_k: int | None = None
     hyde_enabled: bool | None = None
     hyde_model: str | None = None
+    guardrails: dict | None = None
     pii_detection_enabled: bool | None = None
     injection_detection_enabled: bool | None = None
     hallucination_detection_enabled: bool | None = None

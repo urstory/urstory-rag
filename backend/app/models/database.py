@@ -40,6 +40,8 @@ class Document(Base):
         default=DocumentStatus.UPLOADED,
     )
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    source: Mapped[str] = mapped_column(String(50), default="upload")  # "upload" | "watcher"
+    watch_path: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -126,6 +128,18 @@ class Task(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class WatchedFile(Base):
+    __tablename__ = "watched_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    file_path: Mapped[str] = mapped_column(String(1000), unique=True, index=True)
+    file_hash: Mapped[str] = mapped_column(String(64))  # SHA-256
+    file_size: Mapped[int] = mapped_column(Integer)
+    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"))
+    last_synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # --- DB 세션 관리 ---

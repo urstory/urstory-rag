@@ -1,7 +1,8 @@
-"""Step 4.7: 하이브리드 검색 오케스트레이터.
+"""하이브리드 검색 오케스트레이터.
 
 전체 검색 파이프라인 조립:
-  HyDE(선택) → 임베딩 → 병렬 검색(벡터+키워드) → RRF 결합 → 리랭킹(선택) → 답변 생성(선택)
+  [입력 가드레일] → HyDE(선택) → 임베딩 → 병렬 검색 → RRF 결합
+  → 리랭킹(선택) → [출력 가드레일: PII] → 답변 생성(선택) → [출력 가드레일: 할루시네이션]
 """
 from __future__ import annotations
 
@@ -9,10 +10,14 @@ import asyncio
 import time
 
 from app.config import RAGSettings
+from app.exceptions import GuardrailViolation
 from app.models.schemas import PipelineStep, SearchPipelineResult, SearchResult
 from app.services.embedding.base import EmbeddingProvider
 from app.services.generation.base import LLMProvider
 from app.services.generation.prompts import SYSTEM_PROMPT, build_prompt
+from app.services.guardrails.hallucination import HallucinationDetector
+from app.services.guardrails.injection import PromptInjectionDetector
+from app.services.guardrails.pii import KoreanPIIDetector
 from app.services.hyde.generator import HyDEGenerator
 from app.services.reranking.base import Reranker
 from app.services.search.rrf import RRFCombiner
@@ -21,8 +26,8 @@ from app.services.search.rrf import RRFCombiner
 class HybridSearchOrchestrator:
     """하이브리드 검색 오케스트레이터.
 
-    벡터 검색, 키워드 검색, RRF 결합, 리랭킹, HyDE, 답변 생성을
-    설정에 따라 동적으로 조합하여 실행한다.
+    벡터 검색, 키워드 검색, RRF 결합, 리랭킹, HyDE, 답변 생성,
+    가드레일(인젝션/PII/할루시네이션)을 설정에 따라 동적으로 조합하여 실행한다.
     """
 
     def __init__(
@@ -42,25 +47,37 @@ class HybridSearchOrchestrator:
         self.llm = llm
         self.rrf = RRFCombiner()
 
+        # 가드레일 (LLM이 필요한 것은 llm 공유)
+        self.injection_detector = PromptInjectionDetector(llm=llm)
+        self.pii_detector = KoreanPIIDetector(llm=None)  # PII LLM 검증은 별도 설정
+        self.hallucination_detector = HallucinationDetector(llm=llm)
+
     async def search(
         self,
         query: str,
         settings: RAGSettings,
         generate_answer: bool = True,
     ) -> SearchPipelineResult:
-        """전체 검색 파이프라인을 실행한다.
-
-        Args:
-            query: 사용자 검색 쿼리.
-            settings: RAG 런타임 설정.
-            generate_answer: True이면 LLM 답변 생성 포함.
-
-        Returns:
-            SearchPipelineResult(documents, answer, trace).
-        """
+        """전체 검색 파이프라인을 실행한다."""
         trace: list[PipelineStep] = []
 
-        # 1. HyDE (선택적)
+        # ── [입력 가드레일] 프롬프트 인젝션 검사 ──
+        if settings.injection_detection_enabled:
+            t0 = time.perf_counter()
+            injection_result = await self.injection_detector.detect(query)
+            passed = not injection_result.blocked
+            trace.append(PipelineStep(
+                name="guardrail_input",
+                passed=passed,
+                duration_ms=_elapsed_ms(t0),
+                detail={"reason": injection_result.reason} if not passed else None,
+            ))
+            if injection_result.blocked:
+                raise GuardrailViolation(
+                    injection_result.reason or "프롬프트 인젝션이 감지되었습니다."
+                )
+
+        # ── 1. HyDE (선택적) ──
         search_query = query
         if settings.hyde_enabled and self.hyde.should_apply(query, "all"):
             t0 = time.perf_counter()
@@ -73,7 +90,7 @@ class HybridSearchOrchestrator:
                 detail={"generated_length": len(hyde_doc)},
             ))
 
-        # 2. 모드별 검색 실행
+        # ── 2. 모드별 검색 실행 ──
         mode = settings.search_mode
         documents: list[SearchResult] = []
 
@@ -107,7 +124,7 @@ class HybridSearchOrchestrator:
                 results_count=len(documents),
             ))
 
-        # 4. 리랭킹 (선택적)
+        # ── 4. 리랭킹 (선택적) ──
         if settings.reranking_enabled:
             t0 = time.perf_counter()
             documents = await self.reranker.rerank(
@@ -120,7 +137,25 @@ class HybridSearchOrchestrator:
                 results_count=len(documents),
             ))
 
-        # 5. 답변 생성 (선택적)
+        # ── [출력 가드레일 1] PII 탐지/마스킹 ──
+        if settings.pii_detection_enabled:
+            t0 = time.perf_counter()
+            pii_found = False
+            for doc in documents:
+                pii_matches = await self.pii_detector.detect(
+                    doc.content, llm_verification=False,
+                )
+                if pii_matches:
+                    pii_found = True
+                    doc.content = self.pii_detector.mask(doc.content, pii_matches)
+            trace.append(PipelineStep(
+                name="guardrail_pii",
+                passed=True,
+                duration_ms=_elapsed_ms(t0),
+                detail={"pii_found": pii_found},
+            ))
+
+        # ── 5. 답변 생성 (선택적) ──
         answer: str | None = None
         if generate_answer:
             t0 = time.perf_counter()
@@ -131,6 +166,23 @@ class HybridSearchOrchestrator:
                 passed=True,
                 duration_ms=_elapsed_ms(t0),
             ))
+
+        # ── [출력 가드레일 2] 할루시네이션 검증 ──
+        if settings.hallucination_detection_enabled and answer is not None:
+            t0 = time.perf_counter()
+            doc_contents = [d.content for d in documents]
+            hal_result = await self.hallucination_detector.verify(answer, doc_contents)
+            passed = hal_result.verdict == "PASS"
+            trace.append(PipelineStep(
+                name="guardrail_hallucination",
+                passed=passed,
+                duration_ms=_elapsed_ms(t0),
+                detail={"grounded_ratio": hal_result.grounded_ratio},
+            ))
+            if not passed:
+                answer = self.hallucination_detector.handle_result(
+                    answer, hal_result, action="warn",
+                )
 
         return SearchPipelineResult(
             documents=documents,

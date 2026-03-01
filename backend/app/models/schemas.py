@@ -70,6 +70,12 @@ class DebugSearchResponse(SearchResponse):
     pipeline_trace: list[PipelineStep]
 
 
+class GuardrailsSettingsResponse(BaseModel):
+    pii_detection: dict
+    injection_detection: dict
+    hallucination_detection: dict
+
+
 class SettingsResponse(BaseModel):
     chunking_strategy: str
     chunk_size: int
@@ -87,6 +93,7 @@ class SettingsResponse(BaseModel):
     retriever_top_k: int
     hyde_enabled: bool
     hyde_model: str
+    guardrails: GuardrailsSettingsResponse
     pii_detection_enabled: bool
     injection_detection_enabled: bool
     hallucination_detection_enabled: bool
@@ -112,6 +119,7 @@ class SettingsUpdateRequest(BaseModel):
     retriever_top_k: int | None = None
     hyde_enabled: bool | None = None
     hyde_model: str | None = None
+    guardrails: dict | None = None
     pii_detection_enabled: bool | None = None
     injection_detection_enabled: bool | None = None
     hallucination_detection_enabled: bool | None = None

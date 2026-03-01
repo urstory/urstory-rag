@@ -21,6 +21,39 @@ class Settings(BaseSettings):
     langfuse_host: str = "http://localhost:3100"
 
 
+class PIIDetectionSettings(BaseModel):
+    """PII 탐지 설정."""
+    enabled: bool = True
+    action: str = "mask"  # mask, block
+    patterns: list[str] = [
+        "주민등록번호", "외국인등록번호", "휴대전화", "일반전화",
+        "사업자등록번호", "여권번호", "운전면허번호", "이메일", "계좌번호",
+    ]
+    llm_verification: bool = True
+
+
+class InjectionDetectionSettings(BaseModel):
+    """프롬프트 인젝션 탐지 설정."""
+    enabled: bool = True
+    action: str = "block"  # block, warn
+    block_message: str = "이 질문은 처리할 수 없습니다."
+
+
+class HallucinationDetectionSettings(BaseModel):
+    """할루시네이션 탐지 설정."""
+    enabled: bool = True
+    action: str = "warn"  # warn, block, regenerate
+    threshold: float = 0.8
+    judge_model: str = "qwen2.5:7b"
+
+
+class GuardrailsSettings(BaseModel):
+    """가드레일 통합 설정."""
+    pii_detection: PIIDetectionSettings = PIIDetectionSettings()
+    injection_detection: InjectionDetectionSettings = InjectionDetectionSettings()
+    hallucination_detection: HallucinationDetectionSettings = HallucinationDetectionSettings()
+
+
 class RAGSettings(BaseModel):
     """2단계: DB 런타임 설정 (관리자 UI에서 변경 가능)."""
 
@@ -50,10 +83,32 @@ class RAGSettings(BaseModel):
     hyde_enabled: bool = True
     hyde_model: str = "qwen2.5:7b"
 
-    # 가드레일
+    # 가드레일 (세부 설정)
+    guardrails: GuardrailsSettings = GuardrailsSettings()
+
+    # 가드레일 플랫 플래그 (하위 호환성 + 파이프라인에서 빠른 참조용)
     pii_detection_enabled: bool = True
     injection_detection_enabled: bool = True
     hallucination_detection_enabled: bool = True
+
+    def model_post_init(self, __context) -> None:
+        """플랫 플래그와 guardrails 서브모델 양방향 동기화.
+
+        - 플랫 플래그가 명시적으로 설정됐으면 → 서브모델 업데이트
+        - 그렇지 않으면 서브모델 값 → 플랫 플래그로 동기화
+        """
+        explicitly_set = self.model_fields_set
+
+        for flat, sub_attr in [
+            ("pii_detection_enabled", "pii_detection"),
+            ("injection_detection_enabled", "injection_detection"),
+            ("hallucination_detection_enabled", "hallucination_detection"),
+        ]:
+            sub = getattr(self.guardrails, sub_attr)
+            if flat in explicitly_set:
+                sub.enabled = getattr(self, flat)
+            else:
+                object.__setattr__(self, flat, sub.enabled)
 
     # 답변 생성
     llm_provider: str = "ollama"

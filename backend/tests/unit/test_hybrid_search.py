@@ -94,6 +94,10 @@ def rag_settings() -> RAGSettings:
         rrf_constant=60,
         vector_weight=0.5,
         keyword_weight=0.5,
+        # Phase 4 테스트에서는 가드레일 비활성화
+        injection_detection_enabled=False,
+        pii_detection_enabled=False,
+        hallucination_detection_enabled=False,
     )
 
 

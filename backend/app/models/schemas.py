@@ -34,6 +34,7 @@ class SearchRequest(BaseModel):
     search_mode: str | None = None
     hyde_enabled: bool | None = None
     reranking_enabled: bool | None = None
+    generate_answer: bool = True
 
 
 class SearchResult(BaseModel):
@@ -55,6 +56,14 @@ class PipelineStep(BaseModel):
     passed: bool
     duration_ms: float
     results_count: int | None = None
+    detail: dict | None = None
+
+
+class SearchPipelineResult(BaseModel):
+    """하이브리드 검색 오케스트레이터의 반환 타입."""
+    documents: list[SearchResult]
+    answer: str | None = None
+    trace: list[PipelineStep] = []
 
 
 class DebugSearchResponse(SearchResponse):

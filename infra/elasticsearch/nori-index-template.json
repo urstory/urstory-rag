@@ -1,0 +1,40 @@
+{
+  "index_patterns": ["rag_*"],
+  "template": {
+    "settings": {
+      "analysis": {
+        "tokenizer": {
+          "nori_mixed": {
+            "type": "nori_tokenizer",
+            "decompound_mode": "mixed"
+          }
+        },
+        "analyzer": {
+          "korean": {
+            "type": "custom",
+            "tokenizer": "nori_mixed",
+            "filter": ["nori_readingform", "lowercase", "nori_part_of_speech"]
+          }
+        },
+        "filter": {
+          "nori_part_of_speech": {
+            "type": "nori_part_of_speech",
+            "stoptags": ["E", "J", "SC", "SE", "SF", "SP", "SSC", "SSO", "SY", "VCN", "VCP", "VSV", "VX", "XPN", "XSA", "XSN", "XSV"]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "content": {
+          "type": "text",
+          "analyzer": "korean"
+        },
+        "meta": {
+          "type": "object",
+          "enabled": true
+        }
+      }
+    }
+  }
+}

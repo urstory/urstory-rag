@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+!.env.example
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic
+# versions/ 는 추적해야 함 — 개별 마이그레이션 파일은 유지
+
+# Docker volumes
+redis_data/
+
+# Node (프론트엔드 추후)
+node_modules/
+.next/
+out/
+
+# Claude
+.claude/
+
+# 로그
+*.log
+
+# 업로드 파일 (런타임)
+uploads/

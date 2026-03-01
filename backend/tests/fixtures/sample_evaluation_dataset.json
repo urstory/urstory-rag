@@ -1,0 +1,23 @@
+{
+  "name": "테스트 평가 데이터셋",
+  "items": [
+    {
+      "question": "연차 신청은 어디서 하나요?",
+      "ground_truth": "사내 포털 > 인사 > 연차신청 메뉴에서 진행합니다.",
+      "source_documents": [],
+      "category": "인사"
+    },
+    {
+      "question": "연차는 며칠 전에 신청해야 하나요?",
+      "ground_truth": "연차는 최소 3일 전에 신청해야 합니다.",
+      "source_documents": [],
+      "category": "인사"
+    },
+    {
+      "question": "긴급한 사유가 있을 때 연차 당일 신청이 가능한가요?",
+      "ground_truth": "긴급한 사유가 있을 경우 당일 신청도 가능합니다.",
+      "source_documents": [],
+      "category": "인사"
+    }
+  ]
+}

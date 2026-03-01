@@ -12,7 +12,7 @@ export function SearchResults({ data }: SearchResultsProps) {
   if (!data) return null;
 
   return (
-    <div className="space-y-4">
+    <div data-testid="search-results" className="space-y-4">
       {data.pipeline_trace && (
         <PipelineTraceView trace={data.pipeline_trace} />
       )}

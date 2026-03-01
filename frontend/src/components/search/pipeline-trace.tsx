@@ -87,7 +87,7 @@ export function PipelineTraceView({ trace }: PipelineTraceViewProps) {
   };
 
   return (
-    <Card>
+    <Card data-testid="pipeline-trace">
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
           <span>파이프라인 실행 결과</span>

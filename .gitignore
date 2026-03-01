@@ -40,9 +40,13 @@ out/
 
 # Claude
 .claude/
+CLAUDE.md
 
 # 로그
 *.log
 
 # 업로드 파일 (런타임)
 uploads/
+
+# 개발 doc
+docs/

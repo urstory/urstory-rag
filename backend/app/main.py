@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import health, settings
+from app.api import documents, health, settings, system, watcher
 from app.config import get_settings
 from app.exceptions import RAGException
 from app.models.database import init_db
@@ -38,3 +38,6 @@ async def rag_exception_handler(request: Request, exc: RAGException):
 
 app.include_router(health.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
+app.include_router(watcher.router, prefix="/api")
+app.include_router(system.router, prefix="/api")

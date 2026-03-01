@@ -78,6 +78,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
+markers = [
+    "performance: 성능 테스트 (별도 실행: pytest -m performance)",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

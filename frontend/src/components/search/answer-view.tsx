@@ -12,7 +12,7 @@ interface AnswerViewProps {
 
 export function AnswerView({ answer, documents }: AnswerViewProps) {
   return (
-    <div className="space-y-4">
+    <div data-testid="answer-view" className="space-y-4">
       {/* Answer */}
       <Card>
         <CardHeader>

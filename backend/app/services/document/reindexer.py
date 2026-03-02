@@ -1,20 +1,33 @@
 """무중단 전체 재인덱싱 서비스."""
 import uuid
-from datetime import datetime
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.config import get_settings
+from app.models.database import Document
 
 
 class ReindexService:
-    """새 인덱스 생성 → 배치 인덱싱 → alias 전환."""
-
-    def __init__(self, indexer=None):
-        self.indexer = indexer
+    """모든 문서를 Celery 태스크로 재인덱싱."""
 
     async def start_reindex(self) -> str:
-        """재인덱싱 시작, task_id 반환."""
+        """DB에서 모든 문서를 조회하고 각각 index_document_task를 디스패치."""
+        from app.tasks.indexing import index_document_task
+
+        settings = get_settings()
+        engine = create_async_engine(settings.database_url, echo=False)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
         task_id = str(uuid.uuid4())
-        # 실제 구현: Celery 태스크로 비동기 실행
-        # 1. 새 ES 인덱스 생성 (rag_documents_{timestamp})
-        # 2. 모든 문서를 새 인덱스에 배치 인덱싱
-        # 3. alias 전환
-        # 4. 이전 인덱스 정리
+
+        async with session_factory() as session:
+            result = await session.execute(select(Document.id))
+            doc_ids = [str(row[0]) for row in result.all()]
+
+        await engine.dispose()
+
+        for doc_id in doc_ids:
+            index_document_task.delay(doc_id)
+
         return task_id

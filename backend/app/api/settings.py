@@ -52,7 +52,9 @@ async def get_available_models():
 
     # API 모델
     if env.openai_api_key:
-        models["api"].append("gpt-4")
+        models["api"].append("gpt-4.1")
+        models["api"].append("gpt-4.1-mini")
+        models["api"].append("gpt-4.1-nano")
         models["api"].append("gpt-4o")
         models["api"].append("gpt-4o-mini")
     if env.anthropic_api_key:

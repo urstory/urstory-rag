@@ -11,8 +11,8 @@ from app.services.document.indexer import DocumentIndexer
 def mock_deps():
     embedding = AsyncMock()
     embedding.embed_documents.return_value = [
-        [0.1] * 1024,
-        [0.2] * 1024,
+        [0.1] * 1536,
+        [0.2] * 1536,
     ]
     pg_store = AsyncMock()
     es_store = AsyncMock()
@@ -65,7 +65,7 @@ class TestDocumentIndexer:
         call_args = pg_store.write.call_args
         embeddings = call_args[0][1]  # 두 번째 위치 인자
         assert len(embeddings) == 2
-        assert len(embeddings[0]) == 1024
+        assert len(embeddings[0]) == 1536
 
     @pytest.mark.asyncio
     async def test_index_empty_chunks(self, mock_deps):

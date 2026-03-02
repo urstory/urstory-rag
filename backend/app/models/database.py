@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -59,7 +60,7 @@ class Chunk(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"))
     content: Mapped[str] = mapped_column(Text)
     chunk_index: Mapped[int] = mapped_column(Integer)
-    # embedding은 pgvector Column으로 별도 정의 (Alembic 마이그레이션에서 처리)
+    embedding = mapped_column(Vector(1536), nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -150,7 +151,7 @@ _async_session_factory = None
 
 def init_db(database_url: str):
     global _engine, _async_session_factory
-    _engine = create_async_engine(database_url, echo=False)
+    _engine = create_async_engine(database_url, echo=False, pool_size=10, max_overflow=20)
     _async_session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
 

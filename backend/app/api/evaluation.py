@@ -161,8 +161,11 @@ async def start_evaluation_run(
     await db.refresh(run)
 
     # Celery 태스크 비동기 실행
-    from app.tasks.evaluation import run_evaluation_task
-    run_evaluation_task.delay(str(run.dataset_id), str(run.id))
+    try:
+        from app.tasks.evaluation import run_evaluation_task
+        run_evaluation_task.delay(str(run.dataset_id), str(run.id))
+    except Exception:
+        pass  # Celery 미기동 시에도 API 응답은 정상 반환
 
     return _run_to_response(run)
 

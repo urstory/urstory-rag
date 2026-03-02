@@ -44,7 +44,23 @@ class HallucinationDetectionSettings(BaseModel):
     enabled: bool = True
     action: str = "warn"  # warn, block, regenerate
     threshold: float = 0.8
-    judge_model: str = "qwen2.5:7b"
+    judge_model: str = "gpt-4.1-mini"
+
+
+class RetrievalGateSettings(BaseModel):
+    """검색 품질 게이트 설정."""
+    enabled: bool = True
+    min_top_score: float = 0.05
+    min_doc_count: int = 1
+    min_doc_score: float = 0.1
+    not_found_message: str = "관련 문서를 충분히 찾지 못했습니다. 다른 키워드로 검색해 주세요."
+
+
+class FaithfulnessSettings(BaseModel):
+    """충실도 검증 설정."""
+    enabled: bool = True
+    action: str = "warn"  # warn, block
+    threshold: float = 0.9
 
 
 class GuardrailsSettings(BaseModel):
@@ -52,19 +68,24 @@ class GuardrailsSettings(BaseModel):
     pii_detection: PIIDetectionSettings = PIIDetectionSettings()
     injection_detection: InjectionDetectionSettings = InjectionDetectionSettings()
     hallucination_detection: HallucinationDetectionSettings = HallucinationDetectionSettings()
+    retrieval_gate: RetrievalGateSettings = RetrievalGateSettings()
+    faithfulness: FaithfulnessSettings = FaithfulnessSettings()
 
 
 class RAGSettings(BaseModel):
     """2단계: DB 런타임 설정 (관리자 UI에서 변경 가능)."""
 
     # 청킹
-    chunking_strategy: str = "recursive"
-    chunk_size: int = 512
-    chunk_overlap: int = 50
+    chunking_strategy: str = "auto"
+    chunk_size: int = 1024
+    chunk_overlap: int = 200
+    contextual_chunking_enabled: bool = False
+    contextual_chunking_model: str = "gpt-4.1-mini"
+    contextual_chunking_max_doc_chars: int = 2000
 
     # 임베딩
-    embedding_provider: str = "ollama"
-    embedding_model: str = "bge-m3"
+    embedding_provider: str = "openai"
+    embedding_model: str = "text-embedding-3-small"
 
     # 검색
     search_mode: str = "hybrid"
@@ -76,12 +97,12 @@ class RAGSettings(BaseModel):
     # 리랭킹
     reranking_enabled: bool = True
     reranker_model: str = "dragonkue/bge-reranker-v2-m3-ko"
-    reranker_top_k: int = 5
+    reranker_top_k: int = 8
     retriever_top_k: int = 20
 
     # HyDE
     hyde_enabled: bool = True
-    hyde_model: str = "qwen2.5:7b"
+    hyde_model: str = "gpt-4.1-mini"
 
     # 가드레일 (세부 설정)
     guardrails: GuardrailsSettings = GuardrailsSettings()
@@ -90,6 +111,8 @@ class RAGSettings(BaseModel):
     pii_detection_enabled: bool = True
     injection_detection_enabled: bool = True
     hallucination_detection_enabled: bool = True
+    retrieval_quality_gate_enabled: bool = True
+    faithfulness_enabled: bool = True
 
     def model_post_init(self, __context) -> None:
         """플랫 플래그와 guardrails 서브모델 양방향 동기화.
@@ -103,6 +126,8 @@ class RAGSettings(BaseModel):
             ("pii_detection_enabled", "pii_detection"),
             ("injection_detection_enabled", "injection_detection"),
             ("hallucination_detection_enabled", "hallucination_detection"),
+            ("retrieval_quality_gate_enabled", "retrieval_gate"),
+            ("faithfulness_enabled", "faithfulness"),
         ]:
             sub = getattr(self.guardrails, sub_attr)
             if flat in explicitly_set:
@@ -111,13 +136,10 @@ class RAGSettings(BaseModel):
                 object.__setattr__(self, flat, sub.enabled)
 
     # 답변 생성
-    llm_provider: str = "ollama"
-    llm_model: str = "qwen2.5:7b"
-    system_prompt: str = (
-        "당신은 한국어 문서 기반 질의응답 시스템입니다. "
-        "제공된 컨텍스트만을 사용하여 정확하게 답변하세요. "
-        "컨텍스트에 답이 없으면 '제공된 문서에서 해당 정보를 찾을 수 없습니다'라고 답하세요."
-    )
+    llm_provider: str = "openai"
+    llm_model: str = "gpt-4.1-mini"
+    llm_temperature: float = 0.3
+    system_prompt: str = ""  # 비어있으면 prompts.py의 SYSTEM_PROMPT 사용
 
 
 @lru_cache

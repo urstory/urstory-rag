@@ -25,12 +25,12 @@ async def test_get_default_settings():
 
         assert response.status_code == 200
         data = response.json()
-        assert data["chunking_strategy"] == "recursive"
-        assert data["chunk_size"] == 512
+        assert data["chunking_strategy"] == "auto"
+        assert data["chunk_size"] == 1024
         assert data["reranking_enabled"] is True
         assert data["reranker_model"] == "dragonkue/bge-reranker-v2-m3-ko"
         assert data["hyde_enabled"] is True
-        assert data["llm_provider"] == "ollama"
+        assert data["llm_provider"] == "openai"
     finally:
         app.dependency_overrides.clear()
 

@@ -20,10 +20,15 @@ class RecursiveChunking:
         if len(text) <= self.chunk_size:
             return [Chunk(content=text, chunk_index=0, metadata=meta or {})]
 
+        # chunk_size에 따라 문장 그룹 크기 조정
+        # 1024자 → 약 6문장, 512자 → 약 3문장
+        split_length = max(2, self.chunk_size // 170)
+        split_overlap = max(1, split_length // 3)
+
         splitter = DocumentSplitter(
             split_by="sentence",
-            split_length=3,
-            split_overlap=1,
+            split_length=split_length,
+            split_overlap=split_overlap,
         )
 
         doc = Document(content=text, meta=meta or {})

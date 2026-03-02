@@ -17,7 +17,8 @@ from haystack import Pipeline
 from haystack.components.builders import PromptBuilder
 from haystack.components.joiners import DocumentJoiner
 from haystack.components.rankers import TransformersSimilarityRanker
-from haystack_integrations.components.embedders.ollama import OllamaTextEmbedder
+from haystack.components.embedders import OpenAITextEmbedder
+from haystack.utils import Secret
 from haystack_integrations.components.generators.ollama import OllamaGenerator
 from haystack_integrations.components.retrievers.elasticsearch import (
     ElasticsearchBM25Retriever,
@@ -37,7 +38,9 @@ from app.config import RAGSettings, Settings
 # ---------------------------------------------------------------------------
 
 _RAG_PROMPT_TEMPLATE = """\
-다음은 사용자의 질문에 답변하기 위한 참고 문서입니다.
+당신은 사내 문서를 기반으로 질문에 답변하는 AI 어시스턴트입니다.
+숫자, 퍼센트, 기간, 금액, 고유명사는 문서 원문을 글자 그대로 사용하세요. 절대 바꿔 말하지 마세요.
+목록이나 항목을 나열할 때는 문서에 기재된 모든 항목을 빠짐없이 포함하세요.
 
 {% for doc in documents %}
 --- 문서 {{ loop.index }} ---
@@ -46,7 +49,7 @@ _RAG_PROMPT_TEMPLATE = """\
 
 질문: {{ query }}
 
-위 문서만을 근거로 정확하게 답변하세요. \
+위 문서만을 근거로 답변하세요. 숫자와 고유명사는 원문 그대로 사용하고, 하나도 빠뜨리지 마세요.
 문서에 답이 없으면 '제공된 문서에서 해당 정보를 찾을 수 없습니다'라고 답하세요.
 """
 
@@ -89,10 +92,10 @@ def build_search_pipeline(
     needs_joiner = mode == "hybrid"
 
     if needs_vector:
-        # Query Embedder
-        embedder = OllamaTextEmbedder(
+        # Query Embedder — OpenAI text-embedding-3-small
+        embedder = OpenAITextEmbedder(
             model=rag_settings.embedding_model,
-            url=env_settings.ollama_url,
+            api_key=Secret.from_env_var("OPENAI_API_KEY"),
         )
         pipeline.add_component("query_embedder", embedder)
 

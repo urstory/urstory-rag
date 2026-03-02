@@ -39,7 +39,7 @@ def keyword_results() -> list[SearchResult]:
 @pytest.fixture
 def mock_embedder():
     m = AsyncMock()
-    m.embed_query.return_value = [0.1] * 1024
+    m.embed_query.return_value = [0.1] * 1536
     return m
 
 
@@ -98,6 +98,8 @@ def rag_settings() -> RAGSettings:
         injection_detection_enabled=False,
         pii_detection_enabled=False,
         hallucination_detection_enabled=False,
+        retrieval_quality_gate_enabled=False,
+        faithfulness_enabled=False,
     )
 
 

@@ -16,9 +16,11 @@ from app.models.schemas import PipelineStep, SearchPipelineResult, SearchResult
 from app.services.embedding.base import EmbeddingProvider
 from app.services.generation.base import LLMProvider
 from app.services.generation.prompts import SYSTEM_PROMPT, build_prompt
+from app.services.guardrails.faithfulness import FaithfulnessChecker
 from app.services.guardrails.hallucination import HallucinationDetector
 from app.services.guardrails.injection import PromptInjectionDetector
 from app.services.guardrails.pii import KoreanPIIDetector
+from app.services.guardrails.retrieval_gate import RetrievalQualityGate
 from app.services.hyde.generator import HyDEGenerator
 from app.services.reranking.base import Reranker
 from app.services.search.rrf import RRFCombiner
@@ -57,6 +59,8 @@ class HybridSearchOrchestrator:
         self.injection_detector = PromptInjectionDetector(llm=llm)
         self.pii_detector = KoreanPIIDetector(llm=None)  # PII LLM 검증은 별도 설정
         self.hallucination_detector = HallucinationDetector(llm=llm)
+        self.faithfulness_checker = FaithfulnessChecker(llm=llm)
+        self.retrieval_gate = RetrievalQualityGate()
 
     async def search(
         self,
@@ -156,6 +160,34 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_span, {"count": len(documents)})
 
+        # ── [검색 품질 게이트] 점수 기반 품질 평가 ──
+        if settings.retrieval_quality_gate_enabled:
+            gate_settings = settings.guardrails.retrieval_gate
+            self.retrieval_gate.min_top_score = gate_settings.min_top_score
+            self.retrieval_gate.min_doc_count = gate_settings.min_doc_count
+            self.retrieval_gate.min_doc_score = gate_settings.min_doc_score
+
+            t0 = time.perf_counter()
+            gate_result = self.retrieval_gate.evaluate(documents)
+            trace.append(PipelineStep(
+                name="retrieval_gate",
+                passed=gate_result.passed,
+                duration_ms=_elapsed_ms(t0),
+                results_count=gate_result.qualifying_count,
+                detail={
+                    "top_score": gate_result.top_score,
+                    "reason": gate_result.reason,
+                } if not gate_result.passed else {
+                    "top_score": gate_result.top_score,
+                },
+            ))
+            if not gate_result.passed:
+                return SearchPipelineResult(
+                    documents=documents,
+                    answer=gate_settings.not_found_message,
+                    trace=trace,
+                )
+
         # ── [출력 가드레일 1] PII 탐지/마스킹 ──
         if settings.pii_detection_enabled:
             lf_span = self._lf_span(lf_trace, "guardrail-pii")
@@ -194,7 +226,29 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_gen, answer)
 
-        # ── [출력 가드레일 2] 할루시네이션 검증 ──
+        # ── [출력 가드레일 2] 충실도 검증 ──
+        if settings.faithfulness_enabled and answer is not None:
+            faith_settings = settings.guardrails.faithfulness
+            self.faithfulness_checker.threshold = faith_settings.threshold
+
+            lf_span = self._lf_span(lf_trace, "guardrail-faithfulness")
+            t0 = time.perf_counter()
+            doc_contents = [d.content for d in documents]
+            faith_result = await self.faithfulness_checker.verify(answer, doc_contents)
+            passed = faith_result.verdict == "FAITHFUL"
+            trace.append(PipelineStep(
+                name="guardrail_faithfulness",
+                passed=passed,
+                duration_ms=_elapsed_ms(t0),
+                detail={"faithfulness_score": faith_result.faithfulness_score},
+            ))
+            self._lf_end(lf_span, {"faithfulness_score": faith_result.faithfulness_score})
+            if not passed:
+                answer = self.faithfulness_checker.handle_result(
+                    answer, faith_result, action=faith_settings.action,
+                )
+
+        # ── [출력 가드레일 3] 할루시네이션 검증 ──
         if settings.hallucination_detection_enabled and answer is not None:
             lf_span = self._lf_span(lf_trace, "guardrail-hallucination")
             t0 = time.perf_counter()

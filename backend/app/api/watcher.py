@@ -1,5 +1,5 @@
 """감시 제어 API 엔드포인트."""
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.services.document.watcher import get_watcher_service
 
@@ -15,7 +15,7 @@ async def get_watcher_status():
 
 @router.post("/watcher/start")
 async def start_watcher(
-    directories: list[str] | None = None,
+    directories: list[str] | None = Query(default=None),
     use_polling: bool = False,
 ):
     """감시 시작."""
@@ -25,7 +25,7 @@ async def start_watcher(
 
     dirs = directories or []
     if not dirs:
-        return {"error": "감시할 디렉토리를 지정하세요"}, 400
+        raise HTTPException(status_code=400, detail="감시할 디렉토리를 지정하세요")
 
     await service.start(dirs, use_polling=use_polling)
     return {"message": "감시가 시작되었습니다", "running": True, "directories": dirs}

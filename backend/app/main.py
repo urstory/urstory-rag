@@ -23,9 +23,52 @@ async def lifespan(app: FastAPI):
         host=env.langfuse_host,
     )
 
+    # 검색 오케스트레이터 초기화
+    from app.api import search as search_api
+    from app.models.database import _async_session_factory
+    from app.services.hyde.generator import HyDEGenerator
+    from app.services.reranking.korean import KoreanCrossEncoder
+    from app.services.search.hybrid import HybridSearchOrchestrator
+    from app.services.search.keyword_es import ElasticsearchNoriEngine
+    from app.services.search.vector import VectorSearchEngine
+    from app.services.settings import SettingsService
+
+    # 임베딩: OpenAI text-embedding-3-small (1536차원)
+    from app.services.embedding.openai import OpenAIEmbedding
+    embedder = OpenAIEmbedding(api_key=env.openai_api_key)
+
+    # LLM: OpenAI가 있으면 gpt-4.1-mini, 없으면 Ollama
+    if env.openai_api_key:
+        from app.services.generation.openai import OpenAILLM
+        llm = OpenAILLM(api_key=env.openai_api_key, model="gpt-4.1-mini")
+    else:
+        from app.services.generation.ollama import OllamaLLM
+        llm = OllamaLLM(url=env.ollama_url)
+
+    vector_engine = VectorSearchEngine(session_factory=_async_session_factory)
+    keyword_engine = ElasticsearchNoriEngine(es_url=env.elasticsearch_url)
+    reranker = KoreanCrossEncoder()
+    hyde_generator = HyDEGenerator(llm=llm)
+
+    orchestrator = HybridSearchOrchestrator(
+        embedder=embedder,
+        vector_engine=vector_engine,
+        keyword_engine=keyword_engine,
+        reranker=reranker,
+        hyde_generator=hyde_generator,
+        llm=llm,
+        langfuse_monitor=app.state.langfuse_monitor,
+    )
+    search_api.set_orchestrator(orchestrator)
+
+    settings_session = _async_session_factory()
+    settings_service = SettingsService(db=settings_session)
+    search_api.set_search_settings_service(settings_service)
+
     yield
 
-    # 종료 시 flush
+    # 종료 시 정리
+    await settings_session.close()
     app.state.langfuse_monitor.flush()
 
 

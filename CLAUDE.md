@@ -7,21 +7,22 @@
 
 ## 개발 환경
 - 현재 개발 머신: Mac Studio (Apple Silicon)
-- Ollama가 호스트에 설치/실행 중 (http://localhost:11434)
-  - Docker 내 Ollama는 Metal GPU 미사용으로 5-6배 느림 → 반드시 호스트에서 실행
-- Ollama 모델: bge-m3 (임베딩), qwen2.5:7b (HyDE/답변 생성)
+- **LLM/임베딩: OpenAI API만 사용** (Ollama 사용하지 않음)
+  - 임베딩: text-embedding-3-small
+  - LLM: gpt-4.1-mini (답변 생성, HyDE)
+  - 평가 Judge: gpt-4o
 
 ## 핵심 설계 원칙
 - **모든 기능 즉시 구현**: 리랭킹, HyDE, 가드레일, RAGAS를 점진적이 아닌 초기부터 모두 포함
   - 관리자 UI에서 각 기능의 ON/OFF 제어
-- **저사양 대응**: Ollama를 쓸 수 없는 환경에서는 OpenAI/Claude 등 외부 API로 전환 가능
+- **OpenAI API 전용**: 임베딩, LLM 생성, 평가 모두 OpenAI API 사용 (Ollama 미사용)
 - **인프라 공유**: `infra/` docker-compose(PostgreSQL+Elasticsearch)는 다른 프로젝트와 공유 목적
   - 앱과 인프라를 분리하여 인프라는 한 번 띄우면 여러 프로젝트가 접속
 
 ## 기술 스택 결정 사유
 - **관리자 UI**: Next.js + React (사용자 지정)
 - **백엔드**: Python + FastAPI + Haystack 2.x (사용자 지정)
-- **임베딩 모델**: bge-m3 → MIRACL 한국어 nDCG@10=69.9 다국어 1위
+- **임베딩 모델**: text-embedding-3-small (OpenAI)
 - **리랭커**: dragonkue/bge-reranker-v2-m3-ko → 한국어 AutoRAG F1=0.9123 전체 1위
   - cross-encoder/ms-marco-MiniLM은 영어 전용이므로 사용 금지
 - **키워드 검색**: Elasticsearch+Nori 기본, kiwipiepy+BM25 대안
@@ -45,6 +46,12 @@
 - Phase 간 인수인계: 이전 Phase의 API 계약(엔드포인트, 스키마)을 다음 에이전트에 전달
 - 병렬 작업 시 인터페이스(Protocol, API 명세) 먼저 합의 후 각자 구현
 - 모든 에이전트는 TDD 원칙 준수 (백엔드), 빌드 검증 필수 (프론트엔드)
+
+## RAG 품질 튜닝
+- **튜닝 로그**: `docs/rag_tuning_log.md` — 전략 변경/재인덱싱/테스트 사이클 기록
+- **테스트 결과**: `docs/rag_quality_test_report_v*.md` — 라운드별 상세 보고서
+- **테스트 스크립트**: `test_files/run_quality_test.py` — 60개 Q&A 자동 테스트
+- **Q&A 데이터셋**: `test_files/q_a.txt` (PDF 30개), `test_files/q_a2.txt` (MD 30개)
 
 ## 개발 프로세스
 - **백엔드**: TDD (RED → GREEN → REFACTOR)

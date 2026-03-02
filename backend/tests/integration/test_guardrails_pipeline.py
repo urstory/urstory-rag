@@ -36,7 +36,7 @@ def _make_orchestrator(
         docs = [_result("테스트 문서 내용")]
 
     embedder = AsyncMock()
-    embedder.embed_query.return_value = [0.1] * 1024
+    embedder.embed_query.return_value = [0.1] * 1536
 
     vector_engine = AsyncMock()
     vector_engine.search.return_value = docs

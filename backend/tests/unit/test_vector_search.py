@@ -74,7 +74,7 @@ class TestVectorSearchEngine:
         factory, _ = _mock_session_factory(rows)
         engine = VectorSearchEngine(session_factory=factory)
 
-        query_embedding = [0.1] * 1024
+        query_embedding = [0.1] * 1536
         results = await engine.search(query_embedding=query_embedding, top_k=5)
 
         assert len(results) == 1
@@ -91,7 +91,7 @@ class TestVectorSearchEngine:
         factory, mock_session = _mock_session_factory(rows)
         engine = VectorSearchEngine(session_factory=factory)
 
-        query_embedding = [0.1] * 1024
+        query_embedding = [0.1] * 1536
         results = await engine.search(query_embedding=query_embedding, top_k=3)
 
         assert len(results) == 3
@@ -114,7 +114,7 @@ class TestVectorSearchEngine:
         factory, _ = _mock_session_factory(rows)
         engine = VectorSearchEngine(session_factory=factory)
 
-        results = await engine.search(query_embedding=[0.1] * 1024, top_k=10)
+        results = await engine.search(query_embedding=[0.1] * 1536, top_k=10)
 
         assert len(results) == 3
         # score = 1 - distance: 0.95, 0.80, 0.50
@@ -129,7 +129,7 @@ class TestVectorSearchEngine:
         factory, _ = _mock_session_factory([])
         engine = VectorSearchEngine(session_factory=factory)
 
-        results = await engine.search(query_embedding=[0.1] * 1024, top_k=5)
+        results = await engine.search(query_embedding=[0.1] * 1536, top_k=5)
 
         assert results == []
         assert isinstance(results, list)
@@ -144,7 +144,7 @@ class TestVectorSearchEngine:
         engine = VectorSearchEngine(session_factory=factory)
 
         results = await engine.search(
-            query_embedding=[0.1] * 1024,
+            query_embedding=[0.1] * 1536,
             top_k=5,
             doc_id=target_doc_id,
         )
@@ -175,7 +175,7 @@ class TestVectorSearchEngine:
         engine = VectorSearchEngine(session_factory=mock_factory)
 
         with pytest.raises(SearchServiceError, match="벡터 검색 실패"):
-            await engine.search(query_embedding=[0.1] * 1024, top_k=5)
+            await engine.search(query_embedding=[0.1] * 1536, top_k=5)
 
     async def test_vector_search_metadata_none(self):
         """metadata가 None인 row도 정상 처리되는지 확인."""
@@ -185,7 +185,7 @@ class TestVectorSearchEngine:
         factory, _ = _mock_session_factory(rows)
         engine = VectorSearchEngine(session_factory=factory)
 
-        results = await engine.search(query_embedding=[0.1] * 1024)
+        results = await engine.search(query_embedding=[0.1] * 1536)
 
         assert len(results) == 1
         assert results[0].metadata is None

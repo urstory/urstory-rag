@@ -8,6 +8,7 @@ from app.services.chunking.recursive import RecursiveChunking
 from app.services.chunking.semantic import SemanticChunking
 from app.services.chunking.contextual import ContextualChunking
 from app.services.chunking.auto_detect import AutoDetectChunking
+from app.services.chunking.header import SectionHeaderChunking
 
 LONG_TEXT = """한국어 자연어 처리는 다양한 기술을 활용합니다.
 형태소 분석은 한국어 텍스트의 기본 단위를 파악하는 데 중요합니다.
@@ -96,35 +97,181 @@ class TestSemanticChunking:
 
 class TestContextualChunking:
     @pytest.mark.asyncio
-    async def test_contextual_chunking(self):
-        """Contextual Retrieval — mock LLM 사용."""
+    async def test_contextual_wraps_any_strategy(self):
+        """어떤 전략이든 래핑 가능."""
         mock_llm = AsyncMock()
         mock_llm.generate.return_value = "이 청크는 한국어 NLP에 대한 내용입니다."
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
 
-        chunker = ContextualChunking(
-            llm_provider=mock_llm,
-            chunk_size=100,
-            chunk_overlap=20,
-        )
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
         chunks = await chunker.chunk(LONG_TEXT)
 
         assert len(chunks) >= 1
-        # 각 청크에 LLM이 생성한 맥락이 추가되어야 함
         for chunk in chunks:
             assert "이 청크는" in chunk.content
         assert mock_llm.generate.call_count == len(chunks)
+
+    @pytest.mark.asyncio
+    async def test_contextual_prepends_context(self):
+        """LLM 맥락이 청크 앞에 추가된다."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "[맥락]"
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(LONG_TEXT)
+
+        for chunk in chunks:
+            assert chunk.content.startswith("[맥락]\n\n")
+
+    @pytest.mark.asyncio
+    async def test_contextual_llm_failure_fallback(self):
+        """LLM 실패 → 원본 청크 유지."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.side_effect = Exception("LLM 오류")
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(LONG_TEXT)
+
+        assert len(chunks) >= 1
+        # LLM 실패했으므로 원본 그대로
+        for chunk in chunks:
+            assert "[맥락]" not in chunk.content
+
+    @pytest.mark.asyncio
+    async def test_contextual_metadata_annotation(self):
+        """metadata에 contextual: True 추가."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "맥락 요약"
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(LONG_TEXT)
+
+        for chunk in chunks:
+            assert chunk.metadata.get("contextual") is True
+
+    @pytest.mark.asyncio
+    async def test_contextual_with_header_strategy(self):
+        """SectionHeaderChunking 위에도 contextual 적용 가능."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "맥락"
+        base = SectionHeaderChunking(chunk_size=1024, chunk_overlap=100)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(MARKDOWN_TEXT, meta={"file_type": "md"})
+
+        assert len(chunks) >= 1
+        for chunk in chunks:
+            assert chunk.content.startswith("맥락\n\n")
+
+
+MARKDOWN_TEXT = """# 블루멤버스 안내
+
+블루멤버스는 현대자동차의 고객 포인트 프로그램입니다.
+
+## 포인트 적립
+
+포인트는 차량 구매 시 자동 적립됩니다. 최대 130만 포인트까지 적립 가능합니다.
+적립된 포인트의 유효기간은 60개월(5년)입니다.
+
+## 포인트 사용
+
+포인트는 현대자동차 정비, 부품 구매, 액세서리 구매 등에 사용할 수 있습니다.
+최소 사용 단위는 1,000 포인트입니다.
+
+### 사용 제한
+
+일부 프로모션 상품에는 포인트 사용이 제한될 수 있습니다.
+법인 회원의 경우 별도 규정이 적용됩니다.
+"""
+
+PDF_LIKE_TEXT = """블루멤버스 서비스 안내서
+
+본 문서는 블루멤버스 서비스의 전반적인 내용을 안내합니다.
+고객 여러분의 편의를 위해 작성되었습니다.
+
+포인트 적립 방법
+
+차량 구매 시 자동으로 포인트가 적립됩니다.
+적립 비율은 차종에 따라 다릅니다.
+최대 적립 한도는 130만 포인트입니다.
+
+포인트 사용 안내
+
+적립된 포인트는 다양한 서비스에 사용할 수 있습니다.
+정비, 부품 구매, 액세서리 구매가 가능합니다.
+"""
+
+
+class TestSectionHeaderChunking:
+    def setup_method(self):
+        self.chunker = SectionHeaderChunking(chunk_size=1024, chunk_overlap=100)
+
+    @pytest.mark.asyncio
+    async def test_markdown_headings_parsed(self):
+        """마크다운 헤딩이 파싱되어 브레드크럼이 추가된다."""
+        chunks = await self.chunker.chunk(MARKDOWN_TEXT, meta={"file_type": "md"})
+
+        assert len(chunks) >= 1
+        # 브레드크럼이 포함되어야 함
+        has_breadcrumb = any("[#" in c.content for c in chunks)
+        assert has_breadcrumb
+
+    @pytest.mark.asyncio
+    async def test_markdown_breadcrumb_hierarchy(self):
+        """하위 헤딩에 상위 헤딩이 포함된 브레드크럼이 생성된다."""
+        chunks = await self.chunker.chunk(MARKDOWN_TEXT, meta={"file_type": "md"})
+
+        # "### 사용 제한" 청크에 상위 헤더가 포함되어야 함
+        restriction_chunks = [c for c in chunks if "사용 제한" in c.content]
+        assert len(restriction_chunks) >= 1
+        # 브레드크럼에 "블루멤버스 안내 > ## 포인트 사용 > ### 사용 제한"
+        assert "포인트 사용" in restriction_chunks[0].content
+
+    @pytest.mark.asyncio
+    async def test_plaintext_heading_detection(self):
+        """평문(PDF)에서 짧은 줄이 헤딩으로 감지된다."""
+        chunks = await self.chunker.chunk(PDF_LIKE_TEXT, meta={"file_type": "pdf"})
+
+        assert len(chunks) >= 1
+        # 평문 헤딩이 브레드크럼으로 추가되어야 함
+        has_heading = any("적립" in c.content or "사용" in c.content for c in chunks)
+        assert has_heading
+
+    @pytest.mark.asyncio
+    async def test_chunk_index_sequential(self):
+        """청크 인덱스가 순차적으로 부여된다."""
+        chunks = await self.chunker.chunk(MARKDOWN_TEXT, meta={"file_type": "md"})
+
+        for i, chunk in enumerate(chunks):
+            assert chunk.chunk_index == i
+
+    @pytest.mark.asyncio
+    async def test_empty_text_returns_empty(self):
+        """빈 텍스트 → 빈 리스트."""
+        chunks = await self.chunker.chunk("", meta={"file_type": "md"})
+        assert chunks == []
+
+    @pytest.mark.asyncio
+    async def test_no_headings_fallback(self):
+        """헤딩이 없는 텍스트 → 브레드크럼 없이 청킹."""
+        plain = "이것은 헤딩이 없는 일반 텍스트입니다. 여러 문장이 있습니다."
+        chunks = await self.chunker.chunk(plain, meta={"file_type": "md"})
+        assert len(chunks) >= 1
 
 
 class TestAutoDetectChunking:
     @pytest.mark.asyncio
     async def test_auto_detect_markdown(self):
-        """마크다운 파일 → 적절한 전략 선택."""
+        """마크다운 파일 → SectionHeaderChunking 선택."""
         chunker = AutoDetectChunking()
         strategy = chunker.detect_strategy(
             meta={"file_type": "md"},
             text="# Title\n\nParagraph\n\n## Section\n\nMore text",
         )
-        assert strategy is not None
+        assert isinstance(strategy, SectionHeaderChunking)
 
     @pytest.mark.asyncio
     async def test_auto_detect_plain_text(self):
@@ -140,5 +287,41 @@ class TestAutoDetectChunking:
     async def test_auto_detect_chunk(self):
         """auto_detect의 chunk 메서드가 동작하는지 확인."""
         chunker = AutoDetectChunking()
+        chunks = await chunker.chunk(LONG_TEXT, meta={"file_type": "txt"})
+        assert len(chunks) >= 1
+
+
+class TestAutoDetectContextual:
+    @pytest.mark.asyncio
+    async def test_auto_contextual_enabled(self):
+        """ON → ContextualChunking 래핑."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "맥락 추가됨"
+        chunker = AutoDetectChunking(
+            llm_provider=mock_llm, contextual_enabled=True,
+        )
+        chunks = await chunker.chunk(LONG_TEXT, meta={"file_type": "txt"})
+        assert len(chunks) >= 1
+        for chunk in chunks:
+            assert "맥락 추가됨" in chunk.content
+        assert mock_llm.generate.call_count == len(chunks)
+
+    @pytest.mark.asyncio
+    async def test_auto_contextual_disabled(self):
+        """OFF → 기본 전략."""
+        mock_llm = AsyncMock()
+        chunker = AutoDetectChunking(
+            llm_provider=mock_llm, contextual_enabled=False,
+        )
+        chunks = await chunker.chunk(LONG_TEXT, meta={"file_type": "txt"})
+        assert len(chunks) >= 1
+        mock_llm.generate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_auto_contextual_no_llm(self):
+        """LLM 없으면 비활성."""
+        chunker = AutoDetectChunking(
+            llm_provider=None, contextual_enabled=True,
+        )
         chunks = await chunker.chunk(LONG_TEXT, meta={"file_type": "txt"})
         assert len(chunks) >= 1

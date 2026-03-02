@@ -1,7 +1,7 @@
 """시스템 API: 재인덱싱, 작업상태, 연결 상태."""
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,7 @@ async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db)):
     """작업 상태 확인."""
     task = await db.get(Task, uuid.UUID(task_id))
     if not task:
-        return {"error": "Task not found"}, 404
+        raise HTTPException(status_code=404, detail="Task not found")
 
     return {
         "task_id": str(task.id),

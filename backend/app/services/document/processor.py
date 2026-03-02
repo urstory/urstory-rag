@@ -4,9 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Document, DocumentStatus
 from app.services.chunking.auto_detect import AutoDetectChunking
+from app.services.chunking.header import SectionHeaderChunking
 from app.services.chunking.recursive import RecursiveChunking
+from app.services.chunking.semantic import SemanticChunking
 from app.services.document.converter import DocumentConverter
 from app.services.document.indexer import DocumentIndexer
+from app.services.embedding.base import EmbeddingProvider
+from app.services.generation.base import LLMProvider
 
 
 class DocumentProcessor:
@@ -17,12 +21,20 @@ class DocumentProcessor:
         converter: DocumentConverter,
         indexer: DocumentIndexer,
         db_session: AsyncSession,
-        chunking_strategy: str = "recursive",
+        chunking_strategy: str = "auto",
+        embedder: EmbeddingProvider | None = None,
+        llm_provider: LLMProvider | None = None,
+        contextual_chunking_enabled: bool = False,
+        contextual_chunking_max_doc_chars: int = 2000,
     ):
         self.converter = converter
         self.indexer = indexer
         self.db_session = db_session
         self.chunking_strategy = chunking_strategy
+        self.embedder = embedder
+        self.llm_provider = llm_provider
+        self.contextual_chunking_enabled = contextual_chunking_enabled
+        self.contextual_chunking_max_doc_chars = contextual_chunking_max_doc_chars
 
     async def process(self, doc_id: str, file_path: str):
         try:
@@ -35,7 +47,8 @@ class DocumentProcessor:
             # 3. 청킹
             chunks = await chunker.chunk(document.content, document.meta)
 
-            # 4. 듀얼 인덱싱
+            # 4. 기존 청크 삭제 후 듀얼 인덱싱
+            await self.indexer.delete(doc_id)
             await self.indexer.index(doc_id, chunks)
 
             # 5. DB 상태 업데이트
@@ -48,9 +61,18 @@ class DocumentProcessor:
     def _get_chunking_strategy(self):
         strategies = {
             "recursive": lambda: RecursiveChunking(),
-            "auto": lambda: AutoDetectChunking(),
+            "recursive_1024": lambda: RecursiveChunking(chunk_size=1024, chunk_overlap=200),
+            "header": lambda: SectionHeaderChunking(chunk_size=1024, chunk_overlap=200),
+            "auto": lambda: AutoDetectChunking(
+                llm_provider=self.llm_provider,
+                contextual_enabled=self.contextual_chunking_enabled,
+                max_doc_chars=self.contextual_chunking_max_doc_chars,
+            ),
+            "semantic": lambda: SemanticChunking(
+                embedding_provider=self.embedder, threshold=0.5
+            ) if self.embedder else AutoDetectChunking(),
         }
-        factory = strategies.get(self.chunking_strategy, strategies["recursive"])
+        factory = strategies.get(self.chunking_strategy, strategies["auto"])
         return factory()
 
     async def _update_status(

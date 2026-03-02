@@ -20,6 +20,12 @@ from app.pipelines.search import build_search_pipeline
 # Fixtures
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def set_openai_env(monkeypatch):
+    """OpenAITextEmbedder가 OPENAI_API_KEY 환경변수를 요구하므로 설정."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-for-pipeline-test")
+
+
 @pytest.fixture
 def env_settings() -> Settings:
     """테스트용 환경 설정."""
@@ -27,6 +33,7 @@ def env_settings() -> Settings:
         database_url="postgresql+asyncpg://admin:pw@localhost:5432/shared",
         elasticsearch_url="http://localhost:9200",
         ollama_url="http://localhost:11434",
+        openai_api_key="sk-test-key-for-pipeline-test",
     )
 
 
@@ -39,7 +46,7 @@ def rag_settings_hybrid() -> RAGSettings:
         reranker_model="dragonkue/bge-reranker-v2-m3-ko",
         reranker_top_k=5,
         retriever_top_k=20,
-        embedding_model="bge-m3",
+        embedding_model="text-embedding-3-small",
         llm_model="qwen2.5:7b",
         llm_provider="ollama",
     )

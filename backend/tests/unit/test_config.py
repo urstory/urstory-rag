@@ -4,16 +4,19 @@ import os
 import pytest
 
 
-def test_settings_from_env(monkeypatch):
+def test_settings_from_env(monkeypatch, tmp_path):
     """환경변수로 Settings 생성 확인."""
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://admin:pw@localhost:5432/shared")
     monkeypatch.setenv("ELASTICSEARCH_URL", "http://localhost:9200")
     monkeypatch.setenv("OLLAMA_URL", "http://localhost:11434")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     from app.config import Settings
 
-    settings = Settings()
+    # .env 파일 읽기를 방지하기 위해 빈 env_file 사용
+    settings = Settings(_env_file=tmp_path / ".env.empty")
     assert settings.database_url == "postgresql+asyncpg://admin:pw@localhost:5432/shared"
     assert settings.elasticsearch_url == "http://localhost:9200"
     assert settings.ollama_url == "http://localhost:11434"
@@ -41,25 +44,25 @@ def test_rag_settings_defaults():
     from app.config import RAGSettings
 
     rag = RAGSettings()
-    assert rag.chunking_strategy == "recursive"
-    assert rag.chunk_size == 512
-    assert rag.chunk_overlap == 50
-    assert rag.embedding_provider == "ollama"
-    assert rag.embedding_model == "bge-m3"
+    assert rag.chunking_strategy == "auto"
+    assert rag.chunk_size == 1024
+    assert rag.chunk_overlap == 200
+    assert rag.embedding_provider == "openai"
+    assert rag.embedding_model == "text-embedding-3-small"
     assert rag.search_mode == "hybrid"
     assert rag.keyword_engine == "elasticsearch"
     assert rag.rrf_constant == 60
     assert rag.reranking_enabled is True
     assert rag.reranker_model == "dragonkue/bge-reranker-v2-m3-ko"
-    assert rag.reranker_top_k == 5
+    assert rag.reranker_top_k == 8
     assert rag.retriever_top_k == 20
     assert rag.hyde_enabled is True
-    assert rag.hyde_model == "qwen2.5:7b"
+    assert rag.hyde_model == "gpt-4.1-mini"
     assert rag.pii_detection_enabled is True
     assert rag.injection_detection_enabled is True
     assert rag.hallucination_detection_enabled is True
-    assert rag.llm_provider == "ollama"
-    assert rag.llm_model == "qwen2.5:7b"
+    assert rag.llm_provider == "openai"
+    assert rag.llm_model == "gpt-4.1-mini"
 
 
 def test_rag_settings_custom_values():
@@ -76,3 +79,67 @@ def test_rag_settings_custom_values():
     assert rag.reranking_enabled is False
     assert rag.hyde_enabled is False
     assert rag.llm_provider == "openai"
+
+
+def test_retrieval_gate_defaults():
+    """RetrievalGateSettings 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.retrieval_quality_gate_enabled is True
+    gate = rag.guardrails.retrieval_gate
+    assert gate.enabled is True
+    assert gate.min_top_score == 0.05
+    assert gate.min_doc_count == 1
+    assert gate.min_doc_score == 0.1
+    assert "찾지 못했습니다" in gate.not_found_message
+
+
+def test_retrieval_gate_flat_flag_sync():
+    """플랫 플래그와 서브모델 양방향 동기화."""
+    from app.config import RAGSettings
+
+    # 플랫 플래그 → 서브모델 동기화
+    rag = RAGSettings(retrieval_quality_gate_enabled=False)
+    assert rag.guardrails.retrieval_gate.enabled is False
+
+    # 서브모델 → 플랫 플래그 동기화
+    rag2 = RAGSettings(
+        guardrails={"retrieval_gate": {"enabled": False}},
+    )
+    assert rag2.retrieval_quality_gate_enabled is False
+
+
+def test_faithfulness_defaults():
+    """FaithfulnessSettings 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.faithfulness_enabled is True
+    faith = rag.guardrails.faithfulness
+    assert faith.enabled is True
+    assert faith.action == "warn"
+    assert faith.threshold == 0.9
+
+
+def test_faithfulness_flat_flag_sync():
+    """충실도 플랫 플래그 양방향 동기화."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(faithfulness_enabled=False)
+    assert rag.guardrails.faithfulness.enabled is False
+
+    rag2 = RAGSettings(
+        guardrails={"faithfulness": {"enabled": False}},
+    )
+    assert rag2.faithfulness_enabled is False
+
+
+def test_contextual_chunking_defaults():
+    """Contextual Chunking 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.contextual_chunking_enabled is False
+    assert rag.contextual_chunking_model == "gpt-4.1-mini"
+    assert rag.contextual_chunking_max_doc_chars == 2000

@@ -74,12 +74,17 @@ class GuardrailsSettingsResponse(BaseModel):
     pii_detection: dict
     injection_detection: dict
     hallucination_detection: dict
+    retrieval_gate: dict
+    faithfulness: dict
 
 
 class SettingsResponse(BaseModel):
     chunking_strategy: str
     chunk_size: int
     chunk_overlap: int
+    contextual_chunking_enabled: bool
+    contextual_chunking_model: str
+    contextual_chunking_max_doc_chars: int
     embedding_provider: str
     embedding_model: str
     search_mode: str
@@ -97,6 +102,8 @@ class SettingsResponse(BaseModel):
     pii_detection_enabled: bool
     injection_detection_enabled: bool
     hallucination_detection_enabled: bool
+    retrieval_quality_gate_enabled: bool
+    faithfulness_enabled: bool
     llm_provider: str
     llm_model: str
     system_prompt: str
@@ -106,6 +113,9 @@ class SettingsUpdateRequest(BaseModel):
     chunking_strategy: str | None = None
     chunk_size: int | None = None
     chunk_overlap: int | None = None
+    contextual_chunking_enabled: bool | None = None
+    contextual_chunking_model: str | None = None
+    contextual_chunking_max_doc_chars: int | None = None
     embedding_provider: str | None = None
     embedding_model: str | None = None
     search_mode: str | None = None
@@ -123,6 +133,8 @@ class SettingsUpdateRequest(BaseModel):
     pii_detection_enabled: bool | None = None
     injection_detection_enabled: bool | None = None
     hallucination_detection_enabled: bool | None = None
+    retrieval_quality_gate_enabled: bool | None = None
+    faithfulness_enabled: bool | None = None
     llm_provider: str | None = None
     llm_model: str | None = None
     system_prompt: str | None = None

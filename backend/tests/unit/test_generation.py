@@ -229,8 +229,8 @@ class TestPromptBuilder:
         # 핵심 규칙이 시스템 프롬프트에 포함되어 있는지 확인
         assert "문서" in SYSTEM_PROMPT
         assert "답변" in SYSTEM_PROMPT
-        # 출처 명시 규칙
-        assert "출처" in SYSTEM_PROMPT
+        # 원문 인용 규칙
+        assert "원문" in SYSTEM_PROMPT or "글자 그대로" in SYSTEM_PROMPT
         # 문서에 없는 내용에 대한 처리 규칙
         assert "찾을 수 없습니다" in SYSTEM_PROMPT
         # 개인정보 마스킹 규칙

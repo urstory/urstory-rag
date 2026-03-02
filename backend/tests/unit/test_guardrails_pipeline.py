@@ -22,7 +22,7 @@ def _result(content: str, score: float = 0.9) -> SearchResult:
 @pytest.fixture
 def mock_deps():
     embedder = AsyncMock()
-    embedder.embed_query.return_value = [0.1] * 1024
+    embedder.embed_query.return_value = [0.1] * 1536
 
     vector_engine = AsyncMock()
     vector_engine.search.return_value = [_result("정상 문서 내용")]
@@ -31,7 +31,18 @@ def mock_deps():
     keyword_engine.search.return_value = [_result("정상 문서 내용")]
 
     reranker = AsyncMock()
-    reranker.rerank.side_effect = lambda q, docs, top_k=5: docs[:top_k]
+
+    def _rerank_with_scores(q, docs, top_k=5):
+        """크로스인코더 리랭커 모사: 새 관련성 점수 부여."""
+        return [
+            SearchResult(
+                chunk_id=d.chunk_id, document_id=d.document_id,
+                content=d.content, score=0.9 - i * 0.1, metadata=d.metadata,
+            )
+            for i, d in enumerate(docs[:top_k])
+        ]
+
+    reranker.rerank.side_effect = _rerank_with_scores
 
     hyde = MagicMock()
     hyde.should_apply.return_value = False
@@ -125,6 +136,8 @@ class TestPipelineWithHallucination:
     async def test_hallucination_warn(self, mock_deps, settings):
         """할루시네이션 FAIL + warn → 경고 추가."""
         embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        # 충실도 검증은 OFF하여 순수 할루시네이션만 테스트
+        settings.faithfulness_enabled = False
 
         # LLM generate 호출을 구분 (답변 생성 vs 할루시네이션 검증)
         call_count = 0
@@ -144,6 +157,154 @@ class TestPipelineWithHallucination:
 
         assert result.answer is not None
         assert "확인되지 않았습니다" in result.answer or "⚠" in result.answer
+
+
+class TestPipelineWithFaithfulness:
+
+    @pytest.mark.asyncio
+    async def test_faithfulness_on_distortion_warns(self, mock_deps, settings):
+        """왜곡 탐지 + warn → 경고 출력."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        settings.hallucination_detection_enabled = False
+        settings.faithfulness_enabled = True
+
+        call_count = 0
+
+        async def mock_generate(prompt, system_prompt=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "생성된 답변"
+            # 두 번째 호출은 충실도 판정
+            return (
+                "faithfulness_score: 0.5\n"
+                "distortions: ['원문: 130만 → 답변: 100만']\n"
+                "verdict: UNFAITHFUL"
+            )
+
+        llm.generate.side_effect = mock_generate
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트", settings)
+
+        assert result.answer is not None
+        assert "⚠️" in result.answer
+        assert "충실도" in result.answer
+        # trace에 guardrail_faithfulness 기록
+        faith_steps = [s for s in result.trace if s.name == "guardrail_faithfulness"]
+        assert len(faith_steps) == 1
+        assert faith_steps[0].passed is False
+
+    @pytest.mark.asyncio
+    async def test_faithfulness_off_skips(self, mock_deps, settings):
+        """충실도 검증 OFF → 건너뜀."""
+        settings.faithfulness_enabled = False
+        settings.hallucination_detection_enabled = False
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트", settings)
+
+        faith_steps = [s for s in result.trace if s.name == "guardrail_faithfulness"]
+        assert len(faith_steps) == 0
+
+    @pytest.mark.asyncio
+    async def test_faithfulness_before_hallucination(self, mock_deps, settings):
+        """순서 검증: 충실도 먼저, 할루시네이션 후."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        settings.faithfulness_enabled = True
+        settings.hallucination_detection_enabled = True
+
+        call_count = 0
+
+        async def mock_generate(prompt, system_prompt=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "생성된 답변"
+            if call_count == 2:
+                # 충실도 검증: FAITHFUL
+                return "faithfulness_score: 0.95\ndistortions: []\nverdict: FAITHFUL"
+            # 할루시네이션 검증: PASS
+            return "grounded_ratio: 0.9\nungrounded_claims: []\nverdict: PASS"
+
+        llm.generate.side_effect = mock_generate
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트", settings)
+
+        trace_names = [s.name for s in result.trace]
+        faith_idx = trace_names.index("guardrail_faithfulness")
+        hal_idx = trace_names.index("guardrail_hallucination")
+        assert faith_idx < hal_idx  # 충실도가 할루시네이션보다 먼저
+
+
+class TestPipelineWithRetrievalGate:
+
+    @pytest.mark.asyncio
+    async def test_gate_on_low_score_returns_not_found(self, mock_deps, settings):
+        """낮은 검색 점수 → 생성 건너뛰고 not_found_message 반환."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        low_score_doc = _result("관련 없는 문서", score=0.01)
+        vector_engine.search.return_value = [low_score_doc]
+        keyword_engine.search.return_value = [low_score_doc]
+        # 리랭커가 낮은 점수를 반환하도록 오버라이드
+        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+            SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
+                         content=d.content, score=0.01, metadata=d.metadata)
+            for d in docs[:top_k]
+        ]
+
+        settings.retrieval_quality_gate_enabled = True
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트 쿼리", settings)
+
+        assert "찾지 못했습니다" in result.answer
+        # LLM generate가 호출되지 않아야 함
+        llm.generate.assert_not_called()
+        # trace에 retrieval_gate 기록
+        gate_steps = [s for s in result.trace if s.name == "retrieval_gate"]
+        assert len(gate_steps) == 1
+        assert gate_steps[0].passed is False
+
+    @pytest.mark.asyncio
+    async def test_gate_on_good_score_generates(self, mock_deps, settings):
+        """높은 검색 점수 → 정상 생성."""
+        settings.retrieval_quality_gate_enabled = True
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트 쿼리", settings)
+
+        assert result.answer is not None
+        assert "찾지 못했습니다" not in result.answer
+        gate_steps = [s for s in result.trace if s.name == "retrieval_gate"]
+        assert len(gate_steps) == 1
+        assert gate_steps[0].passed is True
+
+    @pytest.mark.asyncio
+    async def test_gate_off_always_generates(self, mock_deps, settings):
+        """게이트 OFF → 낮은 점수여도 항상 생성."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        low_score_doc = _result("관련 없는 문서", score=0.1)
+        vector_engine.search.return_value = [low_score_doc]
+        keyword_engine.search.return_value = [low_score_doc]
+        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+            SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
+                         content=d.content, score=0.1, metadata=d.metadata)
+            for d in docs[:top_k]
+        ]
+
+        settings.retrieval_quality_gate_enabled = False
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("테스트 쿼리", settings)
+
+        # 생성이 호출되어야 함
+        assert result.answer is not None
+        assert "찾지 못했습니다" not in result.answer
+        # trace에 retrieval_gate가 없어야 함
+        gate_steps = [s for s in result.trace if s.name == "retrieval_gate"]
+        assert len(gate_steps) == 0
 
 
 class TestAllGuardrailsOff:

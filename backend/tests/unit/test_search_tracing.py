@@ -52,6 +52,8 @@ def rag_settings() -> RAGSettings:
         injection_detection_enabled=False,
         pii_detection_enabled=False,
         hallucination_detection_enabled=False,
+        retrieval_quality_gate_enabled=False,
+        faithfulness_enabled=False,
     )
 
 
@@ -60,7 +62,7 @@ def orchestrator_with_tracing(mock_langfuse_monitor):
     from app.services.search.hybrid import HybridSearchOrchestrator
 
     mock_embedder = AsyncMock()
-    mock_embedder.embed_query.return_value = [0.1] * 1024
+    mock_embedder.embed_query.return_value = [0.1] * 1536
 
     mock_vector = AsyncMock()
     mock_vector.search.return_value = [_make_result(UUID_A, 0.9)]
@@ -154,7 +156,7 @@ class TestSearchTracing:
         from app.services.search.hybrid import HybridSearchOrchestrator
 
         mock_embedder = AsyncMock()
-        mock_embedder.embed_query.return_value = [0.1] * 1024
+        mock_embedder.embed_query.return_value = [0.1] * 1536
         mock_vector = AsyncMock()
         mock_vector.search.return_value = [_make_result(UUID_A, 0.9)]
         mock_keyword = AsyncMock()

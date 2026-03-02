@@ -62,6 +62,10 @@ def settings() -> RAGSettings:
         injection_detection_enabled=True,
         pii_detection_enabled=True,
         hallucination_detection_enabled=True,
+        # Phase 11: 기존 테스트 격리
+        multi_query_enabled=False,
+        exact_citation_enabled=False,
+        numeric_verification_enabled=False,
     )
 
 

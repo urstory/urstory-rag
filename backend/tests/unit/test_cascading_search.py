@@ -122,6 +122,10 @@ def cascading_settings() -> RAGSettings:
         hallucination_detection_enabled=False,
         retrieval_quality_gate_enabled=False,
         faithfulness_enabled=False,
+        # Phase 11: 기존 테스트 격리
+        multi_query_enabled=False,
+        exact_citation_enabled=False,
+        numeric_verification_enabled=False,
     )
 
 

@@ -113,6 +113,17 @@ class RAGSettings(BaseModel):
     query_expansion_enabled: bool = True
     query_expansion_max_keywords: int = 10
 
+    # 멀티쿼리
+    multi_query_enabled: bool = True
+    multi_query_count: int = 4
+    multi_query_model: str = "gpt-4.1-mini"
+
+    # 정확 인용 모드
+    exact_citation_enabled: bool = True
+
+    # 숫자 검증 가드레일
+    numeric_verification_enabled: bool = True
+
     # 가드레일 (세부 설정)
     guardrails: GuardrailsSettings = GuardrailsSettings()
 

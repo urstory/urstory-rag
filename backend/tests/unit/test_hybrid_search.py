@@ -100,6 +100,10 @@ def rag_settings() -> RAGSettings:
         hallucination_detection_enabled=False,
         retrieval_quality_gate_enabled=False,
         faithfulness_enabled=False,
+        # Phase 11: 기존 테스트 격리를 위해 비활성화
+        multi_query_enabled=False,
+        exact_citation_enabled=False,
+        numeric_verification_enabled=False,
     )
 
 
@@ -257,3 +261,164 @@ class TestSearchWithReranking:
         mock_reranker.rerank.assert_not_called()
         trace_names = [step.name for step in result.trace]
         assert "reranking" not in trace_names
+
+
+# ==========================================================
+# Phase 11: 멀티쿼리 + 정확 인용 + 숫자 검증 통합 테스트
+# ==========================================================
+
+@pytest.fixture
+def multi_query_settings() -> RAGSettings:
+    """멀티쿼리/정확인용/숫자검증 활성 설정."""
+    return RAGSettings(
+        search_mode="hybrid",
+        reranking_enabled=True,
+        hyde_enabled=False,
+        retriever_top_k=20,
+        reranker_top_k=5,
+        injection_detection_enabled=False,
+        pii_detection_enabled=False,
+        hallucination_detection_enabled=False,
+        retrieval_quality_gate_enabled=False,
+        faithfulness_enabled=False,
+        # Phase 11 활성화
+        multi_query_enabled=True,
+        multi_query_count=4,
+        exact_citation_enabled=True,
+        numeric_verification_enabled=True,
+    )
+
+
+@pytest.fixture
+def mq_orchestrator(
+    mock_embedder, mock_vector_engine, mock_keyword_engine,
+    mock_reranker, mock_hyde, mock_llm,
+):
+    """멀티쿼리 테스트용 오케스트레이터."""
+    from app.services.search.hybrid import HybridSearchOrchestrator
+
+    # mock_llm.generate의 기본 반환을 멀티쿼리 + 답변 양쪽에 대응
+    mock_llm.generate.return_value = "이것은 생성된 답변입니다."
+
+    return HybridSearchOrchestrator(
+        embedder=mock_embedder,
+        vector_engine=mock_vector_engine,
+        keyword_engine=mock_keyword_engine,
+        reranker=mock_reranker,
+        hyde_generator=mock_hyde,
+        llm=mock_llm,
+    )
+
+
+class TestMultiQueryIntegration:
+    """멀티쿼리 통합 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_multi_query_trace_recorded(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """멀티쿼리 활성화 시 trace에 multi_query 단계가 기록된다."""
+        result = await mq_orchestrator.search("테스트 질문", multi_query_settings)
+
+        trace_names = [step.name for step in result.trace]
+        assert "multi_query" in trace_names
+        assert "question_classification" in trace_names
+
+    @pytest.mark.asyncio
+    async def test_multi_query_disabled_no_trace(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """멀티쿼리 비활성화 시 multi_query trace가 없다."""
+        multi_query_settings.multi_query_enabled = False
+        result = await mq_orchestrator.search("테스트 질문", multi_query_settings)
+
+        trace_names = [step.name for step in result.trace]
+        assert "multi_query" not in trace_names
+
+    @pytest.mark.asyncio
+    async def test_multi_query_deduplicates_results(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """결과에 중복 chunk_id가 없다."""
+        result = await mq_orchestrator.search("테스트 질문", multi_query_settings)
+
+        chunk_ids = [str(d.chunk_id) for d in result.documents]
+        assert len(chunk_ids) == len(set(chunk_ids))
+
+
+class TestExactCitationIntegration:
+    """정확 인용 모드 통합 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_regulatory_question_uses_evidence(
+        self, mq_orchestrator, multi_query_settings, mock_llm,
+    ):
+        """규정형 질문은 evidence_extraction trace가 기록된다."""
+        # LLM 응답: 근거+답변 형식
+        mock_llm.generate.return_value = (
+            "[근거]\n반기별 1회 이상 실시\n\n[답변]\n반기별 1회 이상 실시해야 합니다."
+        )
+
+        result = await mq_orchestrator.search(
+            "평가는 몇 회 실시해야 하나요?", multi_query_settings,
+        )
+
+        trace_names = [step.name for step in result.trace]
+        assert "evidence_extraction" in trace_names
+
+    @pytest.mark.asyncio
+    async def test_explanatory_question_uses_standard(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """설명형 질문은 기존 generation trace가 기록된다."""
+        result = await mq_orchestrator.search(
+            "장기요양이란 무엇인가요?", multi_query_settings,
+        )
+
+        trace_names = [step.name for step in result.trace]
+        assert "generation" in trace_names
+
+    @pytest.mark.asyncio
+    async def test_exact_citation_disabled_uses_standard(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """정확 인용 비활성 시 규정형 질문도 기존 생성 사용."""
+        multi_query_settings.exact_citation_enabled = False
+
+        result = await mq_orchestrator.search(
+            "평가는 몇 회 실시해야 하나요?", multi_query_settings,
+        )
+
+        trace_names = [step.name for step in result.trace]
+        assert "generation" in trace_names
+        assert "evidence_extraction" not in trace_names
+
+
+class TestNumericVerificationIntegration:
+    """숫자 검증 통합 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_numeric_verification_trace(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """숫자 검증 trace가 기록된다."""
+        result = await mq_orchestrator.search(
+            "장기요양이란 무엇인가요?", multi_query_settings,
+        )
+
+        trace_names = [step.name for step in result.trace]
+        assert "numeric_verification" in trace_names
+
+    @pytest.mark.asyncio
+    async def test_numeric_verification_disabled(
+        self, mq_orchestrator, multi_query_settings,
+    ):
+        """숫자 검증 비활성 시 trace 없음."""
+        multi_query_settings.numeric_verification_enabled = False
+
+        result = await mq_orchestrator.search(
+            "장기요양이란 무엇인가요?", multi_query_settings,
+        )
+
+        trace_names = [step.name for step in result.trace]
+        assert "numeric_verification" not in trace_names

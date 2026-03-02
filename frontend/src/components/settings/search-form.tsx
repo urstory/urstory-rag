@@ -33,6 +33,8 @@ const searchSchema = z.object({
   cascading_fallback_keyword_weight: z.number().min(0).max(1),
   query_expansion_enabled: z.boolean(),
   query_expansion_max_keywords: z.number().min(3).max(20),
+  multi_query_enabled: z.boolean(),
+  multi_query_count: z.number().min(2).max(8),
 });
 
 type SearchFormData = z.infer<typeof searchSchema>;
@@ -56,6 +58,8 @@ export function SearchForm() {
       cascading_fallback_keyword_weight: 0.7,
       query_expansion_enabled: true,
       query_expansion_max_keywords: 10,
+      multi_query_enabled: true,
+      multi_query_count: 4,
     },
   });
 
@@ -81,6 +85,8 @@ export function SearchForm() {
   const cascadingKeywordWeight = form.watch("cascading_fallback_keyword_weight");
   const queryExpansionEnabled = form.watch("query_expansion_enabled");
   const queryExpansionMaxKeywords = form.watch("query_expansion_max_keywords");
+  const multiQueryEnabled = form.watch("multi_query_enabled");
+  const multiQueryCount = form.watch("multi_query_count");
 
   return (
     <Card>
@@ -264,6 +270,38 @@ export function SearchForm() {
               </div>
             </>
           )}
+
+          {/* 멀티쿼리 설정 (모든 모드 공통) */}
+          <div className="rounded-lg border p-4 space-y-4">
+            <h4 className="text-sm font-medium">멀티쿼리 검색</h4>
+            <p className="text-xs text-muted-foreground">
+              LLM으로 질문 변형을 생성하여 병렬 검색 후 결과를 합산합니다
+            </p>
+
+            <div className="flex items-center justify-between">
+              <Label>멀티쿼리 활성화</Label>
+              <Switch
+                checked={multiQueryEnabled}
+                onCheckedChange={(v) => form.setValue("multi_query_enabled", v)}
+              />
+            </div>
+
+            {multiQueryEnabled && (
+              <div className="space-y-2">
+                <Label>쿼리 변형 수: {multiQueryCount}</Label>
+                <Input
+                  type="number"
+                  value={multiQueryCount}
+                  onChange={(e) => form.setValue("multi_query_count", Number(e.target.value))}
+                  min={2}
+                  max={8}
+                />
+                <p className="text-xs text-muted-foreground">
+                  원본 포함 총 변형 수 (2~8, 기본 4)
+                </p>
+              </div>
+            )}
+          </div>
 
           <Button type="submit" disabled={updateMutation.isPending}>
             <Save className="mr-2 h-4 w-4" />

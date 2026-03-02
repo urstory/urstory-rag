@@ -34,6 +34,7 @@ class SearchRequest(BaseModel):
     search_mode: str | None = None
     hyde_enabled: bool | None = None
     reranking_enabled: bool | None = None
+    multi_query_enabled: bool | None = None
     generate_answer: bool = True
 
 
@@ -105,6 +106,11 @@ class SettingsResponse(BaseModel):
     cascading_fallback_keyword_weight: float
     query_expansion_enabled: bool
     query_expansion_max_keywords: int
+    multi_query_enabled: bool
+    multi_query_count: int
+    multi_query_model: str
+    exact_citation_enabled: bool
+    numeric_verification_enabled: bool
     guardrails: GuardrailsSettingsResponse
     pii_detection_enabled: bool
     injection_detection_enabled: bool
@@ -143,6 +149,11 @@ class SettingsUpdateRequest(BaseModel):
     cascading_fallback_keyword_weight: float | None = None
     query_expansion_enabled: bool | None = None
     query_expansion_max_keywords: int | None = None
+    multi_query_enabled: bool | None = None
+    multi_query_count: int | None = None
+    multi_query_model: str | None = None
+    exact_citation_enabled: bool | None = None
+    numeric_verification_enabled: bool | None = None
     guardrails: dict | None = None
     pii_detection_enabled: bool | None = None
     injection_detection_enabled: bool | None = None

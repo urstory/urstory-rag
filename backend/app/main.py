@@ -26,29 +26,42 @@ async def lifespan(app: FastAPI):
     # 검색 오케스트레이터 초기화
     from app.api import search as search_api
     from app.models.database import _async_session_factory
+    from app.services.generation.evidence_extractor import EvidenceExtractor
+    from app.services.guardrails.numeric_verifier import NumericVerifier
     from app.services.hyde.generator import HyDEGenerator
     from app.services.reranking.korean import KoreanCrossEncoder
     from app.services.search.hybrid import HybridSearchOrchestrator
     from app.services.search.keyword_es import ElasticsearchNoriEngine
+    from app.services.search.multi_query import MultiQueryGenerator
+    from app.services.search.query_expander import QueryExpander
+    from app.services.search.question_classifier import QuestionClassifier
     from app.services.search.vector import VectorSearchEngine
     from app.services.settings import SettingsService
 
-    # 임베딩: OpenAI text-embedding-3-small (1536차원)
+    # RAG 설정 로드 (embedding_model 등)
     from app.services.embedding.openai import OpenAIEmbedding
-    embedder = OpenAIEmbedding(api_key=env.openai_api_key)
+    async with _async_session_factory() as _s:
+        _ss = SettingsService(db=_s)
+        _rag = await _ss.get_settings()
+    embedder = OpenAIEmbedding(api_key=env.openai_api_key, model=_rag.embedding_model, dimensions=1536)
 
-    # LLM: OpenAI가 있으면 gpt-4.1-mini, 없으면 Ollama
-    if env.openai_api_key:
-        from app.services.generation.openai import OpenAILLM
-        llm = OpenAILLM(api_key=env.openai_api_key, model="gpt-4.1-mini")
-    else:
-        from app.services.generation.ollama import OllamaLLM
-        llm = OllamaLLM(url=env.ollama_url)
+    # LLM: OpenAI gpt-4.1-mini
+    from app.services.generation.openai import OpenAILLM
+    llm = OpenAILLM(api_key=env.openai_api_key, model="gpt-4.1-mini")
 
     vector_engine = VectorSearchEngine(session_factory=_async_session_factory)
     keyword_engine = ElasticsearchNoriEngine(es_url=env.elasticsearch_url)
     reranker = KoreanCrossEncoder()
     hyde_generator = HyDEGenerator(llm=llm)
+
+    # Phase 10: Query Expander
+    query_expander = QueryExpander(llm=llm)
+
+    # Phase 11: 멀티쿼리, 질문 분류, 근거 추출, 숫자 검증
+    multi_query_generator = MultiQueryGenerator(llm=llm)
+    question_classifier = QuestionClassifier()
+    evidence_extractor = EvidenceExtractor(llm=llm)
+    numeric_verifier = NumericVerifier()
 
     orchestrator = HybridSearchOrchestrator(
         embedder=embedder,
@@ -58,6 +71,11 @@ async def lifespan(app: FastAPI):
         hyde_generator=hyde_generator,
         llm=llm,
         langfuse_monitor=app.state.langfuse_monitor,
+        query_expander=query_expander,
+        multi_query_generator=multi_query_generator,
+        question_classifier=question_classifier,
+        evidence_extractor=evidence_extractor,
+        numeric_verifier=numeric_verifier,
     )
     search_api.set_orchestrator(orchestrator)
 

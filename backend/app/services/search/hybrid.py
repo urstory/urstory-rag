@@ -1,12 +1,14 @@
 """하이브리드 검색 오케스트레이터.
 
 전체 검색 파이프라인 조립:
-  [입력 가드레일] → HyDE(선택) → 임베딩 → 병렬 검색 → RRF 결합
-  → 리랭킹(선택) → [출력 가드레일: PII] → 답변 생성(선택) → [출력 가드레일: 할루시네이션]
+  [입력 가드레일] → 질문 분류 → 멀티쿼리 생성 → HyDE(선택) → 병렬 검색
+  → RRF 결합 → 리랭킹(선택) → [출력 가드레일: PII] → 답변 생성 분기(규정형/설명형)
+  → [숫자 검증] → [출력 가드레일: 충실도/할루시네이션]
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import TYPE_CHECKING
 
@@ -15,26 +17,33 @@ from app.exceptions import GuardrailViolation
 from app.models.schemas import PipelineStep, SearchPipelineResult, SearchResult
 from app.services.embedding.base import EmbeddingProvider
 from app.services.generation.base import LLMProvider
+from app.services.generation.evidence_extractor import EvidenceExtractor
 from app.services.generation.prompts import SYSTEM_PROMPT, build_prompt
 from app.services.guardrails.faithfulness import FaithfulnessChecker
 from app.services.guardrails.hallucination import HallucinationDetector
 from app.services.guardrails.injection import PromptInjectionDetector
+from app.services.guardrails.numeric_verifier import NumericVerifier
 from app.services.guardrails.pii import KoreanPIIDetector
 from app.services.guardrails.retrieval_gate import RetrievalQualityGate
 from app.services.hyde.generator import HyDEGenerator
 from app.services.reranking.base import Reranker
 from app.services.search.cascading_evaluator import CascadingQualityEvaluator
+from app.services.search.multi_query import MultiQueryGenerator
 from app.services.search.query_expander import QueryExpander
+from app.services.search.question_classifier import QuestionClassifier
 from app.services.search.rrf import RRFCombiner
 
 if TYPE_CHECKING:
     from app.monitoring.langfuse import LangfuseMonitor
 
+logger = logging.getLogger(__name__)
+
 
 class HybridSearchOrchestrator:
     """하이브리드 검색 오케스트레이터.
 
-    벡터 검색, 키워드 검색, RRF 결합, 리랭킹, HyDE, 답변 생성,
+    벡터 검색, 키워드 검색, RRF 결합, 리랭킹, HyDE, 멀티쿼리,
+    질문 분류, 정확 인용 모드, 숫자 검증, 답변 생성,
     가드레일(인젝션/PII/할루시네이션)을 설정에 따라 동적으로 조합하여 실행한다.
     """
 
@@ -48,6 +57,10 @@ class HybridSearchOrchestrator:
         llm: LLMProvider,
         langfuse_monitor: LangfuseMonitor | None = None,
         query_expander: QueryExpander | None = None,
+        multi_query_generator: MultiQueryGenerator | None = None,
+        question_classifier: QuestionClassifier | None = None,
+        evidence_extractor: EvidenceExtractor | None = None,
+        numeric_verifier: NumericVerifier | None = None,
     ) -> None:
         self.embedder = embedder
         self.vector_engine = vector_engine
@@ -58,6 +71,12 @@ class HybridSearchOrchestrator:
         self.rrf = RRFCombiner()
         self.langfuse = langfuse_monitor
         self.query_expander = query_expander or QueryExpander(llm=llm)
+
+        # Phase 11: 멀티쿼리, 질문 분류, 근거 추출, 숫자 검증
+        self.multi_query_generator = multi_query_generator or MultiQueryGenerator(llm=llm)
+        self.question_classifier = question_classifier or QuestionClassifier()
+        self.evidence_extractor = evidence_extractor or EvidenceExtractor(llm=llm)
+        self.numeric_verifier = numeric_verifier or NumericVerifier()
 
         # 가드레일 (LLM이 필요한 것은 llm 공유)
         self.injection_detector = PromptInjectionDetector(llm=llm)
@@ -96,7 +115,37 @@ class HybridSearchOrchestrator:
                     injection_result.reason or "프롬프트 인젝션이 감지되었습니다."
                 )
 
-        # ── 1. HyDE (선택적) ──
+        # ── [Phase 11] 질문 유형 분류 ──
+        question_type = self.question_classifier.classify(query)
+        trace.append(PipelineStep(
+            name="question_classification",
+            passed=True,
+            duration_ms=0.0,
+            detail={
+                "category": question_type.category,
+                "indicators": question_type.indicators,
+            },
+        ))
+
+        # ── [Phase 11] 멀티쿼리 생성 ──
+        if settings.multi_query_enabled:
+            lf_span = self._lf_span(lf_trace, "multi-query")
+            t0 = time.perf_counter()
+            multi_result = await self.multi_query_generator.generate(
+                query, count=settings.multi_query_count,
+            )
+            queries = multi_result.variant_queries
+            trace.append(PipelineStep(
+                name="multi_query",
+                passed=True,
+                duration_ms=_elapsed_ms(t0),
+                detail={"variants": queries},
+            ))
+            self._lf_end(lf_span, {"variants": queries})
+        else:
+            queries = [query]
+
+        # ── 1. HyDE (선택적) — 원문 쿼리에만 적용 ──
         search_query = query
         if settings.hyde_enabled and self.hyde.should_apply(query, "all"):
             lf_span = self._lf_span(lf_trace, "hyde")
@@ -111,51 +160,37 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_span, {"generated_doc": hyde_doc[:200]})
 
-        # ── 2. 모드별 검색 실행 ──
+        # ── 2. 모드별 검색 실행 × 멀티쿼리 (병렬) ──
         mode = settings.search_mode
-        documents: list[SearchResult] = []
 
         lf_search_span = self._lf_span(lf_trace, "hybrid-search")
 
-        if mode == "vector":
-            documents, step = await self._vector_search(search_query, settings)
-            trace.append(step)
+        search_tasks = []
+        for q in queries:
+            if q == query:
+                # 원문: 기존 파이프라인 (HyDE 적용된 search_query 사용)
+                search_tasks.append(
+                    self._search_single(search_query, query, settings, mode, trace),
+                )
+            else:
+                # 변형: 벡터+키워드 직접 검색 (HyDE/Cascading 생략)
+                search_tasks.append(
+                    self._search_variant(q, settings),
+                )
 
-        elif mode == "keyword":
-            documents, step = await self._keyword_search(query, settings)
-            trace.append(step)
+        all_results = await asyncio.gather(*search_tasks)
+        # 원문 검색의 trace는 _search_single에서 직접 추가됨
+        # all_results에서 문서 합집합 생성
+        all_documents: list[SearchResult] = []
+        for result in all_results:
+            all_documents.extend(result)
 
-        elif mode == "cascading":
-            documents, cascading_steps = await self._cascading_search(
-                query, settings,
-            )
-            trace.extend(cascading_steps)
-
-        else:  # hybrid
-            vec_docs, vec_step, kw_docs, kw_step = await self._hybrid_search(
-                search_query, query, settings,
-            )
-            trace.append(vec_step)
-            trace.append(kw_step)
-
-            # 3. RRF 결합
-            t0 = time.perf_counter()
-            documents = self.rrf.combine(
-                vec_docs, kw_docs,
-                k=settings.rrf_constant,
-                vector_weight=settings.vector_weight,
-                keyword_weight=settings.keyword_weight,
-            )
-            trace.append(PipelineStep(
-                name="rrf_fusion",
-                passed=True,
-                duration_ms=_elapsed_ms(t0),
-                results_count=len(documents),
-            ))
+        # ── 결과 합집합 + 중복 제거 ──
+        documents = self._deduplicate_results(all_documents)
 
         self._lf_end(lf_search_span, {"count": len(documents)})
 
-        # ── 4. 리랭킹 (선택적) ──
+        # ── 4. 리랭킹 (선택적) — 전체 합집합에 대해 1회 ──
         if settings.reranking_enabled:
             lf_span = self._lf_span(lf_trace, "reranking")
             t0 = time.perf_counter()
@@ -218,7 +253,7 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_span, {"pii_found": pii_found})
 
-        # ── 5. 답변 생성 (선택적) ──
+        # ── 5. 답변 생성 (선택적) — 규정형/설명형 분기 ──
         answer: str | None = None
         if generate_answer:
             lf_gen = self._lf_generation(
@@ -227,14 +262,70 @@ class HybridSearchOrchestrator:
                 {"query": query, "doc_count": len(documents)},
             )
             t0 = time.perf_counter()
-            prompt = build_prompt(query, documents)
-            answer = await self.llm.generate(prompt, system_prompt=SYSTEM_PROMPT)
-            trace.append(PipelineStep(
-                name="generation",
-                passed=True,
-                duration_ms=_elapsed_ms(t0),
-            ))
+
+            if (
+                settings.exact_citation_enabled
+                and question_type.category == "regulatory"
+            ):
+                # 규정형: CoT 기반 근거 추출 + 답변
+                evidence_result = await self.evidence_extractor.extract_and_answer(
+                    query, documents,
+                )
+                if evidence_result is not None:
+                    answer = evidence_result.answer
+                    trace.append(PipelineStep(
+                        name="evidence_extraction",
+                        passed=True,
+                        duration_ms=_elapsed_ms(t0),
+                        detail={
+                            "evidence_count": len(evidence_result.evidence_sentences),
+                        },
+                    ))
+                else:
+                    # 폴백: 기존 생성 프롬프트
+                    prompt = build_prompt(query, documents)
+                    answer = await self.llm.generate(
+                        prompt, system_prompt=SYSTEM_PROMPT,
+                    )
+                    trace.append(PipelineStep(
+                        name="generation",
+                        passed=True,
+                        duration_ms=_elapsed_ms(t0),
+                    ))
+            else:
+                # 설명형: 기존 생성 프롬프트
+                prompt = build_prompt(query, documents)
+                answer = await self.llm.generate(
+                    prompt, system_prompt=SYSTEM_PROMPT,
+                )
+                trace.append(PipelineStep(
+                    name="generation",
+                    passed=True,
+                    duration_ms=_elapsed_ms(t0),
+                ))
+
             self._lf_end(lf_gen, answer)
+
+        # ── [Phase 11] 숫자 검증 가드레일 ──
+        if settings.numeric_verification_enabled and answer is not None:
+            t0 = time.perf_counter()
+            verification = self.numeric_verifier.verify(
+                answer, [d.content for d in documents],
+            )
+            trace.append(PipelineStep(
+                name="numeric_verification",
+                passed=verification.passed,
+                duration_ms=_elapsed_ms(t0),
+                detail={
+                    "total_numbers": verification.total_numbers_found,
+                    "ungrounded": verification.ungrounded_numbers,
+                },
+            ))
+            if not verification.passed:
+                logger.warning(
+                    "숫자 검증 실패 — 근거 없는 수치: %s",
+                    verification.ungrounded_numbers,
+                )
 
         # ── [출력 가드레일 2] 충실도 검증 ──
         if settings.faithfulness_enabled and answer is not None:
@@ -313,6 +404,83 @@ class HybridSearchOrchestrator:
     # ------------------------------------------------------------------
     # 내부 검색 메서드
     # ------------------------------------------------------------------
+
+    async def _search_single(
+        self,
+        search_query: str,
+        original_query: str,
+        settings: RAGSettings,
+        mode: str,
+        trace: list[PipelineStep],
+    ) -> list[SearchResult]:
+        """단일 쿼리에 대해 모드별 검색을 실행한다 (원문 전용)."""
+        if mode == "vector":
+            docs, step = await self._vector_search(search_query, settings)
+            trace.append(step)
+            return docs
+
+        elif mode == "keyword":
+            docs, step = await self._keyword_search(original_query, settings)
+            trace.append(step)
+            return docs
+
+        elif mode == "cascading":
+            docs, cascading_steps = await self._cascading_search(
+                original_query, settings,
+            )
+            trace.extend(cascading_steps)
+            return docs
+
+        else:  # hybrid
+            vec_docs, vec_step, kw_docs, kw_step = await self._hybrid_search(
+                search_query, original_query, settings,
+            )
+            trace.append(vec_step)
+            trace.append(kw_step)
+
+            t0 = time.perf_counter()
+            docs = self.rrf.combine(
+                vec_docs, kw_docs,
+                k=settings.rrf_constant,
+                vector_weight=settings.vector_weight,
+                keyword_weight=settings.keyword_weight,
+            )
+            trace.append(PipelineStep(
+                name="rrf_fusion",
+                passed=True,
+                duration_ms=_elapsed_ms(t0),
+                results_count=len(docs),
+            ))
+            return docs
+
+    async def _search_variant(
+        self,
+        query: str,
+        settings: RAGSettings,
+    ) -> list[SearchResult]:
+        """변형 쿼리 전용 검색 (HyDE/Cascading 생략, 벡터+키워드 직접)."""
+        vec_docs, _, kw_docs, _ = await self._hybrid_search(
+            query, query, settings,
+        )
+        return self.rrf.combine(
+            vec_docs, kw_docs,
+            k=settings.rrf_constant,
+            vector_weight=settings.vector_weight,
+            keyword_weight=settings.keyword_weight,
+        )
+
+    @staticmethod
+    def _deduplicate_results(
+        documents: list[SearchResult],
+    ) -> list[SearchResult]:
+        """chunk_id 기반 중복 제거, 최고 점수 유지."""
+        seen: dict[str, SearchResult] = {}
+        for doc in documents:
+            key = str(doc.chunk_id)
+            if key not in seen or doc.score > seen[key].score:
+                seen[key] = doc
+        # 점수 내림차순 정렬
+        return sorted(seen.values(), key=lambda d: d.score, reverse=True)
 
     async def _vector_search(
         self, search_query: str, settings: RAGSettings,

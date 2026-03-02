@@ -37,9 +37,17 @@ async def create_processor():
     engine = create_async_engine(settings.database_url, echo=False)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    # 임베딩: OpenAI text-embedding-3-small (1536차원)
+    # RAG 설정 로드 (embedding_model, contextual chunking 등)
+    from app.services.settings import SettingsService
+    settings_service = SettingsService()
+    rag_settings_session = session_factory()
+    settings_service._db = rag_settings_session
+    rag_settings = await settings_service.get_settings()
+    await rag_settings_session.close()
+
+    # 임베딩: OpenAI (설정에서 모델명 로드)
     from app.services.embedding.openai import OpenAIEmbedding
-    embedding = OpenAIEmbedding(api_key=settings.openai_api_key)
+    embedding = OpenAIEmbedding(api_key=settings.openai_api_key, model=rag_settings.embedding_model, dimensions=1536)
     converter = DocumentConverter()
 
     from app.services.document.stores.pgvector_store import PgVectorStore
@@ -49,29 +57,14 @@ async def create_processor():
     es_store = ElasticsearchStore(es_url=settings.elasticsearch_url)
     indexer = DocumentIndexer(embedding, pg_store, es_store)
 
-    # RAG 설정 로드 (contextual chunking 등)
-    from app.services.settings import SettingsService
-    settings_service = SettingsService()
-    rag_settings_session = session_factory()
-    settings_service._db = rag_settings_session
-    rag_settings = await settings_service.get_settings()
-    await rag_settings_session.close()
-
     # Contextual Chunking LLM 프로바이더 (조건부 생성)
     chunk_llm = None
     if rag_settings.contextual_chunking_enabled:
-        if settings.openai_api_key:
-            from app.services.generation.openai import OpenAILLM
-            chunk_llm = OpenAILLM(
-                api_key=settings.openai_api_key,
-                model=rag_settings.contextual_chunking_model,
-            )
-        else:
-            from app.services.generation.ollama import OllamaLLM
-            chunk_llm = OllamaLLM(
-                base_url=settings.ollama_url,
-                model=rag_settings.contextual_chunking_model,
-            )
+        from app.services.generation.openai import OpenAILLM
+        chunk_llm = OpenAILLM(
+            api_key=settings.openai_api_key,
+            model=rag_settings.contextual_chunking_model,
+        )
 
     session = session_factory()
     processor = DocumentProcessor(

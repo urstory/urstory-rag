@@ -47,8 +47,8 @@ def rag_settings_hybrid() -> RAGSettings:
         reranker_top_k=5,
         retriever_top_k=20,
         embedding_model="text-embedding-3-small",
-        llm_model="qwen2.5:7b",
-        llm_provider="ollama",
+        llm_model="gpt-4.1-mini",
+        llm_provider="openai",
     )
 
 

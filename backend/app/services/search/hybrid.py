@@ -28,6 +28,7 @@ from app.services.guardrails.retrieval_gate import RetrievalQualityGate
 from app.services.hyde.generator import HyDEGenerator
 from app.services.reranking.base import Reranker
 from app.services.search.cascading_evaluator import CascadingQualityEvaluator
+from app.services.search.document_scope import DocumentScopeSelector
 from app.services.search.multi_query import MultiQueryGenerator
 from app.services.search.query_expander import QueryExpander
 from app.services.search.question_classifier import QuestionClassifier
@@ -84,6 +85,7 @@ class HybridSearchOrchestrator:
         self.hallucination_detector = HallucinationDetector(llm=llm)
         self.faithfulness_checker = FaithfulnessChecker(llm=llm)
         self.retrieval_gate = RetrievalQualityGate()
+        self.document_scope = DocumentScopeSelector()
 
     async def search(
         self,
@@ -190,6 +192,23 @@ class HybridSearchOrchestrator:
 
         self._lf_end(lf_search_span, {"count": len(documents)})
 
+        # ── 3.5. 문서 스코프 선택 (리랭킹 전) ──
+        if settings.document_scope_enabled and len(documents) > 0:
+            self.document_scope.top_n = settings.document_scope_top_n
+            before_count = len(documents)
+            documents = self.document_scope.select(documents)
+            if len(documents) < before_count:
+                trace.append(PipelineStep(
+                    name="document_scope",
+                    passed=True,
+                    duration_ms=0.0,
+                    detail={
+                        "before": before_count,
+                        "after": len(documents),
+                        "top_n": settings.document_scope_top_n,
+                    },
+                ))
+
         # ── 4. 리랭킹 (선택적) — 전체 합집합에 대해 1회 ──
         if settings.reranking_enabled:
             lf_span = self._lf_span(lf_trace, "reranking")
@@ -205,12 +224,14 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_span, {"count": len(documents)})
 
-        # ── [검색 품질 게이트] 점수 기반 품질 평가 ──
+        # ── [검색 품질 게이트] 점수 기반 품질 평가 + soft_fail 근거 추출 ──
+        gate_soft_failed = False
         if settings.retrieval_quality_gate_enabled:
             gate_settings = settings.guardrails.retrieval_gate
             self.retrieval_gate.min_top_score = gate_settings.min_top_score
             self.retrieval_gate.min_doc_count = gate_settings.min_doc_count
             self.retrieval_gate.min_doc_score = gate_settings.min_doc_score
+            self.retrieval_gate.soft_mode = gate_settings.soft_mode
 
             t0 = time.perf_counter()
             gate_result = self.retrieval_gate.evaluate(documents)
@@ -222,16 +243,21 @@ class HybridSearchOrchestrator:
                 detail={
                     "top_score": gate_result.top_score,
                     "reason": gate_result.reason,
+                    "soft_fail": gate_result.soft_fail,
                 } if not gate_result.passed else {
                     "top_score": gate_result.top_score,
                 },
             ))
             if not gate_result.passed:
-                return SearchPipelineResult(
-                    documents=documents,
-                    answer=gate_settings.not_found_message,
-                    trace=trace,
-                )
+                if gate_result.soft_fail and documents:
+                    # soft_fail: 근거 추출을 시도하여 답변 가능 여부 판정
+                    gate_soft_failed = True
+                else:
+                    return SearchPipelineResult(
+                        documents=documents,
+                        answer=gate_settings.not_found_message,
+                        trace=trace,
+                    )
 
         # ── [출력 가드레일 1] PII 탐지/마스킹 ──
         if settings.pii_detection_enabled:
@@ -253,7 +279,7 @@ class HybridSearchOrchestrator:
             ))
             self._lf_end(lf_span, {"pii_found": pii_found})
 
-        # ── 5. 답변 생성 (선택적) — 규정형/설명형 분기 ──
+        # ── 5. 답변 생성 (선택적) — 규정형/추출형/설명형 분기 ──
         answer: str | None = None
         if generate_answer:
             lf_gen = self._lf_generation(
@@ -263,7 +289,35 @@ class HybridSearchOrchestrator:
             )
             t0 = time.perf_counter()
 
-            if (
+            # soft_fail이면 근거 추출로 답변 가능 여부 판정
+            if gate_soft_failed:
+                evidence_result = await self.evidence_extractor.extract_and_answer(
+                    query, documents,
+                )
+                if (
+                    evidence_result is not None
+                    and evidence_result.evidence_sentences
+                ):
+                    answer = evidence_result.answer
+                    trace.append(PipelineStep(
+                        name="evidence_extraction",
+                        passed=True,
+                        duration_ms=_elapsed_ms(t0),
+                        detail={
+                            "evidence_count": len(evidence_result.evidence_sentences),
+                            "gate_rescue": True,
+                        },
+                    ))
+                else:
+                    # 근거 없음 → 최종 차단
+                    gate_settings = settings.guardrails.retrieval_gate
+                    self._lf_end(lf_gen, None)
+                    return SearchPipelineResult(
+                        documents=documents,
+                        answer=gate_settings.not_found_message,
+                        trace=trace,
+                    )
+            elif (
                 settings.exact_citation_enabled
                 and question_type.category == "regulatory"
             ):
@@ -283,6 +337,32 @@ class HybridSearchOrchestrator:
                     ))
                 else:
                     # 폴백: 기존 생성 프롬프트
+                    prompt = build_prompt(query, documents)
+                    answer = await self.llm.generate(
+                        prompt, system_prompt=SYSTEM_PROMPT,
+                    )
+                    trace.append(PipelineStep(
+                        name="generation",
+                        passed=True,
+                        duration_ms=_elapsed_ms(t0),
+                    ))
+            elif question_type.category == "extraction":
+                # 추출형: 단답 추출 모드
+                evidence_result = await self.evidence_extractor.extract_short_answer(
+                    query, documents,
+                )
+                if evidence_result is not None:
+                    answer = evidence_result.answer
+                    trace.append(PipelineStep(
+                        name="evidence_extraction",
+                        passed=True,
+                        duration_ms=_elapsed_ms(t0),
+                        detail={
+                            "evidence_count": len(evidence_result.evidence_sentences),
+                            "mode": "extraction",
+                        },
+                    ))
+                else:
                     prompt = build_prompt(query, documents)
                     answer = await self.llm.generate(
                         prompt, system_prompt=SYSTEM_PROMPT,

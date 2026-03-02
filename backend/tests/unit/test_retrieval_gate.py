@@ -87,3 +87,58 @@ class TestRetrievalQualityGate:
         result = gate.evaluate(docs)
         assert result.passed is True
         assert result.qualifying_count == 2
+
+
+class TestRetrievalGateSoftMode:
+    """soft_mode 관련 테스트."""
+
+    def test_soft_mode_on_returns_soft_fail(self):
+        """soft_mode=True → 점수 미달 시 soft_fail=True."""
+        gate = RetrievalQualityGate(
+            min_top_score=0.3, min_doc_count=1, min_doc_score=0.1,
+            soft_mode=True,
+        )
+        docs = [_make_result(0.1)]
+        result = gate.evaluate(docs)
+        assert result.passed is False
+        assert result.soft_fail is True
+
+    def test_soft_mode_off_returns_hard_fail(self):
+        """soft_mode=False → 점수 미달 시 soft_fail=False."""
+        gate = RetrievalQualityGate(
+            min_top_score=0.3, min_doc_count=1, min_doc_score=0.1,
+            soft_mode=False,
+        )
+        docs = [_make_result(0.1)]
+        result = gate.evaluate(docs)
+        assert result.passed is False
+        assert result.soft_fail is False
+
+    def test_soft_mode_no_documents_hard_fail(self):
+        """문서 없음은 soft_mode와 무관하게 항상 hard fail."""
+        gate = RetrievalQualityGate(soft_mode=True)
+        result = gate.evaluate([])
+        assert result.passed is False
+        assert result.soft_fail is False
+
+    def test_soft_mode_pass_no_soft_fail(self):
+        """점수 충분이면 soft_fail=False."""
+        gate = RetrievalQualityGate(
+            min_top_score=0.3, min_doc_count=1, min_doc_score=0.1,
+            soft_mode=True,
+        )
+        docs = [_make_result(0.9)]
+        result = gate.evaluate(docs)
+        assert result.passed is True
+        assert result.soft_fail is False
+
+    def test_soft_fail_qualifying_docs(self):
+        """qualifying_docs 미달도 soft_fail."""
+        gate = RetrievalQualityGate(
+            min_top_score=0.3, min_doc_count=3, min_doc_score=0.5,
+            soft_mode=True,
+        )
+        docs = [_make_result(0.8), _make_result(0.2)]
+        result = gate.evaluate(docs)
+        assert result.passed is False
+        assert result.soft_fail is True

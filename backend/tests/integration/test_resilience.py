@@ -44,31 +44,28 @@ async def res_client(res_db):
     app.dependency_overrides.clear()
 
 
-class TestOllamaUnavailable:
-    """Ollama 서비스 미응답 시나리오."""
+class TestOpenAIUnavailable:
+    """OpenAI 서비스 미응답 시나리오."""
 
     @pytest.mark.asyncio
-    async def test_health_reports_ollama_disconnected(self, res_client, res_db):
-        """Ollama 미응답 시 헬스체크에서 disconnected 보고."""
-        with patch("app.api.health.check_ollama", return_value=False):
+    async def test_health_reports_openai_disconnected(self, res_client, res_db):
+        """OpenAI 미응답 시 헬스체크에서 disconnected 보고."""
+        with patch("app.api.health.check_openai", return_value=False):
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
-            assert resp.json()["components"]["ollama"] == "disconnected"
+            assert resp.json()["components"]["openai"] == "disconnected"
 
     @pytest.mark.asyncio
     async def test_models_endpoint_graceful(self, res_client, res_db):
-        """Ollama 미응답 시 모델 목록 빈 리스트 반환."""
-        with patch("app.api.settings.httpx.AsyncClient") as mock_client_cls:
-            mock_instance = AsyncMock()
-            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_instance.__aexit__ = AsyncMock(return_value=False)
-            mock_instance.get = AsyncMock(side_effect=ConnectionError("Connection refused"))
-            mock_client_cls.return_value = mock_instance
-
+        """OpenAI 키 없을 시 모델 목록 빈 리스트 반환."""
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = None
+        mock_settings.anthropic_api_key = None
+        with patch("app.api.settings.get_env_settings", return_value=mock_settings):
             resp = await res_client.get("/api/settings/models")
             assert resp.status_code == 200
             data = resp.json()
-            assert data["ollama"] == []
+            assert data["openai"] == []
 
 
 class TestPartialFailure:
@@ -76,17 +73,17 @@ class TestPartialFailure:
 
     @pytest.mark.asyncio
     async def test_health_partial_failure(self, res_client, res_db):
-        """ES+Ollama 미응답, DB만 연결 시 응답."""
+        """ES+OpenAI 미응답, DB만 연결 시 응답."""
         with (
             patch("app.api.health.check_elasticsearch", return_value=False),
-            patch("app.api.health.check_ollama", return_value=False),
+            patch("app.api.health.check_openai", return_value=False),
             patch("app.api.health.check_redis", return_value=False),
         ):
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
             data = resp.json()
             assert data["components"]["elasticsearch"] == "disconnected"
-            assert data["components"]["ollama"] == "disconnected"
+            assert data["components"]["openai"] == "disconnected"
             assert data["components"]["redis"] == "disconnected"
 
     @pytest.mark.asyncio
@@ -95,7 +92,7 @@ class TestPartialFailure:
         with (
             patch("app.api.health.check_db", return_value=True),
             patch("app.api.health.check_elasticsearch", return_value=True),
-            patch("app.api.health.check_ollama", return_value=True),
+            patch("app.api.health.check_openai", return_value=True),
             patch("app.api.health.check_redis", return_value=True),
         ):
             resp = await res_client.get("/api/health")

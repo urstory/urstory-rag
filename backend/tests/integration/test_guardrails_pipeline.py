@@ -77,6 +77,10 @@ class TestScenario1NormalQuery:
             injection_detection_enabled=True,
             pii_detection_enabled=True,
             hallucination_detection_enabled=True,
+            multi_query_enabled=False,
+            retrieval_quality_gate_enabled=False,
+            faithfulness_enabled=False,
+            numeric_verification_enabled=False,
         )
         orchestrator = _make_orchestrator(
             llm_responses=[
@@ -198,6 +202,10 @@ class TestScenario4HallucinationWarn:
             injection_detection_enabled=False,
             pii_detection_enabled=False,
             reranking_enabled=False,
+            multi_query_enabled=False,
+            retrieval_quality_gate_enabled=False,
+            faithfulness_enabled=False,
+            numeric_verification_enabled=False,
         )
         orchestrator = _make_orchestrator(
             llm_responses=[

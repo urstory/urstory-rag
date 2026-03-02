@@ -53,6 +53,7 @@ class RetrievalGateSettings(BaseModel):
     min_top_score: float = 0.05
     min_doc_count: int = 1
     min_doc_score: float = 0.1
+    soft_mode: bool = True
     not_found_message: str = "관련 문서를 충분히 찾지 못했습니다. 다른 키워드로 검색해 주세요."
 
 
@@ -112,6 +113,10 @@ class RAGSettings(BaseModel):
     cascading_fallback_keyword_weight: float = 0.7
     query_expansion_enabled: bool = True
     query_expansion_max_keywords: int = 10
+
+    # 문서 스코프 선택
+    document_scope_enabled: bool = True
+    document_scope_top_n: int = 3
 
     # 멀티쿼리
     multi_query_enabled: bool = True

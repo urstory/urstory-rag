@@ -47,13 +47,13 @@ async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/system/status")
 async def system_status():
-    """DB, ES, Ollama, Redis 연결 상태."""
-    from app.api.health import check_db, check_elasticsearch, check_ollama, check_redis
+    """DB, ES, OpenAI, Redis 연결 상태."""
+    from app.api.health import check_db, check_elasticsearch, check_openai, check_redis
 
     components = {
         "database": await check_db(),
         "elasticsearch": await check_elasticsearch(),
-        "ollama": await check_ollama(),
+        "openai": await check_openai(),
         "redis": await check_redis(),
     }
 

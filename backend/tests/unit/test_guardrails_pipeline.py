@@ -245,13 +245,12 @@ class TestPipelineWithFaithfulness:
 class TestPipelineWithRetrievalGate:
 
     @pytest.mark.asyncio
-    async def test_gate_on_low_score_returns_not_found(self, mock_deps, settings):
-        """낮은 검색 점수 → 생성 건너뛰고 not_found_message 반환."""
+    async def test_gate_on_low_score_hard_mode_returns_not_found(self, mock_deps, settings):
+        """soft_mode=False + 낮은 점수 → 생성 건너뛰고 not_found_message 반환."""
         embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
         low_score_doc = _result("관련 없는 문서", score=0.01)
         vector_engine.search.return_value = [low_score_doc]
         keyword_engine.search.return_value = [low_score_doc]
-        # 리랭커가 낮은 점수를 반환하도록 오버라이드
         reranker.rerank.side_effect = lambda q, docs, top_k=5: [
             SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
                          content=d.content, score=0.01, metadata=d.metadata)
@@ -259,14 +258,14 @@ class TestPipelineWithRetrievalGate:
         ]
 
         settings.retrieval_quality_gate_enabled = True
+        settings.guardrails.retrieval_gate.soft_mode = False
 
         orchestrator = HybridSearchOrchestrator(*mock_deps)
         result = await orchestrator.search("테스트 쿼리", settings)
 
         assert "찾지 못했습니다" in result.answer
-        # LLM generate가 호출되지 않아야 함
+        # soft_mode=False이므로 LLM generate 호출 없음
         llm.generate.assert_not_called()
-        # trace에 retrieval_gate 기록
         gate_steps = [s for s in result.trace if s.name == "retrieval_gate"]
         assert len(gate_steps) == 1
         assert gate_steps[0].passed is False
@@ -309,6 +308,74 @@ class TestPipelineWithRetrievalGate:
         # trace에 retrieval_gate가 없어야 함
         gate_steps = [s for s in result.trace if s.name == "retrieval_gate"]
         assert len(gate_steps) == 0
+
+
+class TestRetrievalGateSoftFail:
+
+    @pytest.mark.asyncio
+    async def test_soft_fail_with_evidence_allows_answer(self, mock_deps, settings):
+        """soft_fail 시 근거 추출 성공 → 답변 허용."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        low_score_doc = _result("자원봉사자 활동 중 인정되지 않는 봉사활동은 가족이 수행하는 봉사입니다.", score=0.09)
+        vector_engine.search.return_value = [low_score_doc]
+        keyword_engine.search.return_value = [low_score_doc]
+        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+            SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
+                         content=d.content, score=0.09, metadata=d.metadata)
+            for d in docs[:top_k]
+        ]
+
+        settings.retrieval_quality_gate_enabled = True
+        # soft_fail 시 근거 추출이 성공하도록 LLM 설정
+        call_count = 0
+
+        async def mock_generate(prompt, system_prompt=None):
+            nonlocal call_count
+            call_count += 1
+            # 근거 추출 응답
+            return (
+                "가족이 수행하는 봉사활동은 인정되지 않습니다.\n\n"
+                "[답변]\n"
+                "인정되지 않는 봉사활동은 가족이 수행하는 봉사입니다."
+            )
+
+        llm.generate.side_effect = mock_generate
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("인정되지 않는 봉사활동은?", settings)
+
+        # 답변이 생성되어야 함 (not_found가 아님)
+        assert "찾지 못했습니다" not in result.answer
+        assert result.answer is not None
+        # trace에 gate_rescue가 기록됨
+        evidence_steps = [s for s in result.trace if s.name == "evidence_extraction"]
+        assert len(evidence_steps) == 1
+        assert evidence_steps[0].detail.get("gate_rescue") is True
+
+    @pytest.mark.asyncio
+    async def test_soft_fail_no_evidence_returns_not_found(self, mock_deps, settings):
+        """soft_fail 시 근거 추출 실패 → not_found 반환."""
+        embedder, vector_engine, keyword_engine, reranker, hyde, llm = mock_deps
+        low_score_doc = _result("완전히 관련 없는 문서 내용", score=0.02)
+        vector_engine.search.return_value = [low_score_doc]
+        keyword_engine.search.return_value = [low_score_doc]
+        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+            SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
+                         content=d.content, score=0.02, metadata=d.metadata)
+            for d in docs[:top_k]
+        ]
+
+        settings.retrieval_quality_gate_enabled = True
+
+        async def mock_generate(prompt, system_prompt=None):
+            return "근거 없음\n\n[답변]\n해당 정보를 찾을 수 없습니다."
+
+        llm.generate.side_effect = mock_generate
+
+        orchestrator = HybridSearchOrchestrator(*mock_deps)
+        result = await orchestrator.search("등급 유지 호전율은?", settings)
+
+        assert "찾지 못했습니다" in result.answer
 
 
 class TestAllGuardrailsOff:

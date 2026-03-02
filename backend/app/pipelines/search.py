@@ -19,7 +19,7 @@ from haystack.components.joiners import DocumentJoiner
 from haystack.components.rankers import TransformersSimilarityRanker
 from haystack.components.embedders import OpenAITextEmbedder
 from haystack.utils import Secret
-from haystack_integrations.components.generators.ollama import OllamaGenerator
+from haystack.components.generators import OpenAIGenerator
 from haystack_integrations.components.retrievers.elasticsearch import (
     ElasticsearchBM25Retriever,
 )
@@ -92,10 +92,11 @@ def build_search_pipeline(
     needs_joiner = mode == "hybrid"
 
     if needs_vector:
-        # Query Embedder — OpenAI text-embedding-3-small
+        # Query Embedder — OpenAI embedding (dimensions=1536 for HNSW compatibility)
         embedder = OpenAITextEmbedder(
             model=rag_settings.embedding_model,
             api_key=Secret.from_env_var("OPENAI_API_KEY"),
+            dimensions=1536,
         )
         pipeline.add_component("query_embedder", embedder)
 
@@ -159,9 +160,9 @@ def build_search_pipeline(
     )
     pipeline.add_component("prompt_builder", prompt_builder)
 
-    llm = OllamaGenerator(
+    llm = OpenAIGenerator(
         model=rag_settings.llm_model,
-        url=env_settings.ollama_url,
+        api_key=Secret.from_env_var("OPENAI_API_KEY"),
     )
     pipeline.add_component("llm", llm)
 

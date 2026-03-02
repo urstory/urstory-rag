@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
 EVIDENCE_COT_SYSTEM_PROMPT = """당신은 문서를 기반으로 정확하게 답변하는 AI 어시스턴트입니다.
 숫자, 기간, 횟수, 주기, 금액은 문서 원문을 글자 그대로 인용해야 합니다."""
 
+EXTRACTION_SYSTEM_PROMPT = """당신은 문서에서 정확한 정보를 추출하는 AI 어시스턴트입니다.
+이름, 명칭, 고유명사, 목록 항목은 문서 원문을 글자 그대로 추출해야 합니다."""
+
+EXTRACTION_PROMPT = """아래 문서에서 질문의 정답을 찾아 추출하세요.
+
+규칙:
+- 정답이 이름, 명칭, 고유명사이면 문서에 적힌 그대로 추출하세요.
+- 정답이 목록이면 번호를 붙여 모두 나열하세요. 하나도 빠뜨리지 마세요.
+- 문서에 없는 내용은 추가하지 마세요.
+- 서술하지 말고 답만 적으세요.
+
+{documents}
+
+질문: {query}
+
+[근거]
+"""
+
 EVIDENCE_COT_PROMPT = """아래 문서를 참고하여 질문에 답변하세요. 반드시 다음 두 단계를 순서대로 수행하세요.
 
 [1단계: 근거 추출]
@@ -52,6 +70,24 @@ class EvidenceExtractor:
 
     def __init__(self, llm: LLMProvider) -> None:
         self.llm = llm
+
+    async def extract_short_answer(
+        self, query: str, documents: list[SearchResult],
+    ) -> EvidenceResult | None:
+        """추출형 질문 전용: 문서에서 단답을 추출한다 (1회 LLM 호출).
+
+        이름, 명칭, 고유명사, 목록 등 서술 없이 정확한 답만 추출.
+        """
+        try:
+            docs_text = self._format_documents(documents)
+            prompt = EXTRACTION_PROMPT.format(documents=docs_text, query=query)
+            response = await self.llm.generate(
+                prompt, system_prompt=EXTRACTION_SYSTEM_PROMPT,
+            )
+            return self._parse_response(response)
+        except Exception:
+            logger.warning("추출 모드 실패, 기존 생성으로 폴백: %s", query, exc_info=True)
+            return None
 
     async def extract_and_answer(
         self, query: str, documents: list[SearchResult],

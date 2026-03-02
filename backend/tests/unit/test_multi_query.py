@@ -46,17 +46,38 @@ class TestMultiQueryGenerator:
         assert "원문 질문입니다" in result.variant_queries
 
     @pytest.mark.asyncio
-    async def test_negative_query_generates_variants(self, generator, mock_llm):
-        """부정 표현 질문에 대해 변형 쿼리가 생성된다."""
+    async def test_comparison_query_splits_into_subqueries(self, generator, mock_llm):
+        """비교 질문이 각 대상별 개별 질문으로 분리된다."""
         mock_llm.generate.return_value = (
-            "봉사활동 인정 기준\n"
-            "인정되는 봉사 형태와 조건\n"
-            "봉사활동 제외 대상 및 인정 불가 사례"
+            "장기요양 1등급 인정 기준은?\n"
+            "장기요양 2등급 인정 기준은?\n"
+            "장기요양 등급 판정 기준"
         )
 
-        result = await generator.generate("인정되지 않는 봉사 형태는?", count=4)
+        result = await generator.generate("장기요양 1등급과 2등급의 차이는?", count=4)
 
         assert len(result.variant_queries) > 1
+        # 프롬프트에 비교 분리 규칙이 반영됨
+        prompt_used = mock_llm.generate.call_args[0][0]
+        assert "비교" in prompt_used
+        assert "개별 질문" in prompt_used
+
+    @pytest.mark.asyncio
+    async def test_complex_query_splits_conditions(self, generator, mock_llm):
+        """복합 조건 질문이 조건별로 분리된다."""
+        mock_llm.generate.return_value = (
+            "봉사활동 인정 기준은?\n"
+            "봉사활동 인정 불가 사례는?\n"
+            "봉사활동 인정 절차"
+        )
+
+        result = await generator.generate(
+            "인정되는 봉사 형태와 인정되지 않는 봉사 형태는?", count=4
+        )
+
+        assert len(result.variant_queries) > 1
+        prompt_used = mock_llm.generate.call_args[0][0]
+        assert "복합 질문" in prompt_used
 
     @pytest.mark.asyncio
     async def test_parse_variants_handles_numbered_lines(self, generator, mock_llm):

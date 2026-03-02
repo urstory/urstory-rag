@@ -128,3 +128,46 @@ class TestEvidenceExtractor:
 
         assert result.answer == "단순한 답변만 반환합니다."
         assert result.evidence_sentences == []
+
+
+class TestExtractionMode:
+    """추출 모드(extract_short_answer) 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_extract_short_answer_returns_names(self, extractor, mock_llm):
+        """고유명사 추출: 이름 목록을 정확히 반환한다."""
+        mock_llm.generate.return_value = (
+            "Task, Bash, File 에이전트\n\n"
+            "[답변]\n"
+            "1. Task\n2. Bash\n3. File"
+        )
+        docs = [_make_doc("내장 서브에이전트는 Task, Bash, File 세 가지입니다.")]
+
+        result = await extractor.extract_short_answer(
+            "내장된 서브에이전트의 이름은 무엇인가요?", docs,
+        )
+
+        assert result is not None
+        assert "Task" in result.answer
+        assert "Bash" in result.answer
+        assert "File" in result.answer
+
+    @pytest.mark.asyncio
+    async def test_extract_short_answer_uses_extraction_prompt(self, extractor, mock_llm):
+        """추출 모드는 EXTRACTION_SYSTEM_PROMPT를 사용한다."""
+        mock_llm.generate.return_value = "[근거]\nfoo\n\n[답변]\nfoo"
+        docs = [_make_doc("테스트")]
+
+        await extractor.extract_short_answer("이름은 무엇?", docs)
+
+        call_kwargs = mock_llm.generate.call_args
+        assert "추출" in call_kwargs.kwargs.get("system_prompt", call_kwargs[1].get("system_prompt", ""))
+
+    @pytest.mark.asyncio
+    async def test_extract_short_answer_failure_returns_none(self, extractor, mock_llm):
+        """LLM 호출 실패 시 None 반환."""
+        mock_llm.generate.side_effect = Exception("실패")
+        docs = [_make_doc("테스트")]
+
+        result = await extractor.extract_short_answer("이름은?", docs)
+        assert result is None

@@ -40,10 +40,10 @@ class TestLangfuseMonitorEnabled:
         mock_trace = MagicMock()
         mock_trace.generation.return_value = MagicMock()
         gen = self.monitor.create_generation(
-            mock_trace, "answer-gen", "qwen2.5:7b", {"query": "test"},
+            mock_trace, "answer-gen", "gpt-4.1-mini", {"query": "test"},
         )
         mock_trace.generation.assert_called_once_with(
-            name="answer-gen", model="qwen2.5:7b", input={"query": "test"},
+            name="answer-gen", model="gpt-4.1-mini", input={"query": "test"},
         )
         assert gen is not None
 

@@ -143,3 +143,53 @@ def test_contextual_chunking_defaults():
     assert rag.contextual_chunking_enabled is False
     assert rag.contextual_chunking_model == "gpt-4.1-mini"
     assert rag.contextual_chunking_max_doc_chars == 2000
+
+
+def test_cascading_settings_defaults():
+    """Cascading 검색 설정 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.cascading_bm25_threshold == 3.0
+    assert rag.cascading_min_qualifying_docs == 3
+    assert rag.cascading_min_doc_score == 1.0
+    assert rag.cascading_fallback_vector_weight == 0.3
+    assert rag.cascading_fallback_keyword_weight == 0.7
+    assert rag.query_expansion_enabled is True
+    assert rag.query_expansion_max_keywords == 10
+
+
+def test_cascading_settings_custom():
+    """Cascading 검색 설정 커스텀 값."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(
+        search_mode="cascading",
+        cascading_bm25_threshold=5.0,
+        cascading_min_qualifying_docs=5,
+        cascading_fallback_vector_weight=0.2,
+        query_expansion_enabled=False,
+    )
+    assert rag.search_mode == "cascading"
+    assert rag.cascading_bm25_threshold == 5.0
+    assert rag.cascading_min_qualifying_docs == 5
+    assert rag.cascading_fallback_vector_weight == 0.2
+    assert rag.query_expansion_enabled is False
+
+
+def test_cascading_mode_accepted():
+    """search_mode에 'cascading' 값이 허용되어야 한다."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(search_mode="cascading")
+    assert rag.search_mode == "cascading"
+
+
+def test_cascading_settings_in_hybrid_mode_unchanged():
+    """hybrid 모드에서 cascading 설정이 존재하지만 사용되지 않는다."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(search_mode="hybrid")
+    assert rag.search_mode == "hybrid"
+    # cascading 설정은 기본값으로 존재
+    assert rag.cascading_bm25_threshold == 3.0

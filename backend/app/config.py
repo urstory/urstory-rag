@@ -104,6 +104,15 @@ class RAGSettings(BaseModel):
     hyde_enabled: bool = True
     hyde_model: str = "gpt-4.1-mini"
 
+    # Cascading + Query Expansion
+    cascading_bm25_threshold: float = 3.0
+    cascading_min_qualifying_docs: int = 3
+    cascading_min_doc_score: float = 1.0
+    cascading_fallback_vector_weight: float = 0.3
+    cascading_fallback_keyword_weight: float = 0.7
+    query_expansion_enabled: bool = True
+    query_expansion_max_keywords: int = 10
+
     # 가드레일 (세부 설정)
     guardrails: GuardrailsSettings = GuardrailsSettings()
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -20,11 +21,18 @@ import { toast } from "sonner";
 import { Save } from "lucide-react";
 
 const searchSchema = z.object({
-  mode: z.enum(["hybrid", "vector", "keyword"]),
+  mode: z.enum(["hybrid", "vector", "keyword", "cascading"]),
   keyword_engine: z.string(),
   rrf_constant: z.number().min(1).max(200),
   vector_weight: z.number().min(0).max(1),
   keyword_weight: z.number().min(0).max(1),
+  cascading_bm25_threshold: z.number().min(0.5).max(20),
+  cascading_min_qualifying_docs: z.number().min(1).max(10),
+  cascading_min_doc_score: z.number().min(0.1).max(10),
+  cascading_fallback_vector_weight: z.number().min(0).max(1),
+  cascading_fallback_keyword_weight: z.number().min(0).max(1),
+  query_expansion_enabled: z.boolean(),
+  query_expansion_max_keywords: z.number().min(3).max(20),
 });
 
 type SearchFormData = z.infer<typeof searchSchema>;
@@ -41,6 +49,13 @@ export function SearchForm() {
       rrf_constant: 60,
       vector_weight: 0.5,
       keyword_weight: 0.5,
+      cascading_bm25_threshold: 3.0,
+      cascading_min_qualifying_docs: 3,
+      cascading_min_doc_score: 1.0,
+      cascading_fallback_vector_weight: 0.3,
+      cascading_fallback_keyword_weight: 0.7,
+      query_expansion_enabled: true,
+      query_expansion_max_keywords: 10,
     },
   });
 
@@ -55,9 +70,17 @@ export function SearchForm() {
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
 
+  const mode = form.watch("mode");
   const vectorWeight = form.watch("vector_weight");
   const keywordWeight = form.watch("keyword_weight");
   const rrfConstant = form.watch("rrf_constant");
+  const cascadingThreshold = form.watch("cascading_bm25_threshold");
+  const cascadingMinDocs = form.watch("cascading_min_qualifying_docs");
+  const cascadingMinDocScore = form.watch("cascading_min_doc_score");
+  const cascadingVectorWeight = form.watch("cascading_fallback_vector_weight");
+  const cascadingKeywordWeight = form.watch("cascading_fallback_keyword_weight");
+  const queryExpansionEnabled = form.watch("query_expansion_enabled");
+  const queryExpansionMaxKeywords = form.watch("query_expansion_max_keywords");
 
   return (
     <Card>
@@ -69,18 +92,24 @@ export function SearchForm() {
           <div className="space-y-2">
             <Label>검색 모드</Label>
             <Select
-              value={form.watch("mode")}
+              value={mode}
               onValueChange={(v) => form.setValue("mode", v as SearchFormData["mode"])}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hybrid">하이브리드</SelectItem>
+                <SelectItem value="cascading">캐스케이딩 (BM25 우선)</SelectItem>
+                <SelectItem value="hybrid">하이브리드 (RRF)</SelectItem>
                 <SelectItem value="vector">벡터</SelectItem>
                 <SelectItem value="keyword">키워드</SelectItem>
               </SelectContent>
             </Select>
+            {mode === "cascading" && (
+              <p className="text-xs text-muted-foreground">
+                BM25 검색 우선, 불충분 시 쿼리 확장 후 재검색, 최후에 벡터 폴백
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -99,38 +128,142 @@ export function SearchForm() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>RRF Constant (k): {rrfConstant}</Label>
-            <Input
-              type="number"
-              value={rrfConstant}
-              onChange={(e) => form.setValue("rrf_constant", Number(e.target.value))}
-              min={1}
-              max={200}
-            />
-          </div>
+          {/* Hybrid 모드 전용 설정 */}
+          {mode === "hybrid" && (
+            <>
+              <div className="space-y-2">
+                <Label>RRF Constant (k): {rrfConstant}</Label>
+                <Input
+                  type="number"
+                  value={rrfConstant}
+                  onChange={(e) => form.setValue("rrf_constant", Number(e.target.value))}
+                  min={1}
+                  max={200}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>벡터 가중치: {vectorWeight.toFixed(2)}</Label>
-            <Slider
-              value={[vectorWeight]}
-              onValueChange={(v) => form.setValue("vector_weight", v[0])}
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>벡터 가중치: {vectorWeight.toFixed(2)}</Label>
+                <Slider
+                  value={[vectorWeight]}
+                  onValueChange={(v) => form.setValue("vector_weight", v[0])}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>키워드 가중치: {keywordWeight.toFixed(2)}</Label>
-            <Slider
-              value={[keywordWeight]}
-              onValueChange={(v) => form.setValue("keyword_weight", v[0])}
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>키워드 가중치: {keywordWeight.toFixed(2)}</Label>
+                <Slider
+                  value={[keywordWeight]}
+                  onValueChange={(v) => form.setValue("keyword_weight", v[0])}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Cascading 모드 전용 설정 */}
+          {mode === "cascading" && (
+            <>
+              <div className="rounded-lg border p-4 space-y-4">
+                <h4 className="text-sm font-medium">BM25 품질 판정</h4>
+
+                <div className="space-y-2">
+                  <Label>BM25 충분 판정 임계값: {cascadingThreshold.toFixed(1)}</Label>
+                  <Slider
+                    value={[cascadingThreshold]}
+                    onValueChange={(v) => form.setValue("cascading_bm25_threshold", v[0])}
+                    min={0.5}
+                    max={20}
+                    step={0.5}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ES BM25 top score가 이 값 이상이면 충분으로 판정
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>최소 유효 문서 수: {cascadingMinDocs}</Label>
+                  <Input
+                    type="number"
+                    value={cascadingMinDocs}
+                    onChange={(e) => form.setValue("cascading_min_qualifying_docs", Number(e.target.value))}
+                    min={1}
+                    max={10}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>유효 문서 최소 점수: {cascadingMinDocScore.toFixed(1)}</Label>
+                  <Slider
+                    value={[cascadingMinDocScore]}
+                    onValueChange={(v) => form.setValue("cascading_min_doc_score", v[0])}
+                    min={0.1}
+                    max={10}
+                    step={0.1}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-4">
+                <h4 className="text-sm font-medium">쿼리 확장 (HyDE)</h4>
+
+                <div className="flex items-center justify-between">
+                  <Label>쿼리 확장 활성화</Label>
+                  <Switch
+                    checked={queryExpansionEnabled}
+                    onCheckedChange={(v) => form.setValue("query_expansion_enabled", v)}
+                  />
+                </div>
+
+                {queryExpansionEnabled && (
+                  <div className="space-y-2">
+                    <Label>확장 키워드 최대 개수: {queryExpansionMaxKeywords}</Label>
+                    <Input
+                      type="number"
+                      value={queryExpansionMaxKeywords}
+                      onChange={(e) => form.setValue("query_expansion_max_keywords", Number(e.target.value))}
+                      min={3}
+                      max={20}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-4">
+                <h4 className="text-sm font-medium">벡터 폴백 가중치</h4>
+                <p className="text-xs text-muted-foreground">
+                  BM25 + 쿼리 확장 모두 불충분 시 벡터 폴백에 적용되는 RRF 가중치
+                </p>
+
+                <div className="space-y-2">
+                  <Label>키워드 가중치: {cascadingKeywordWeight.toFixed(2)}</Label>
+                  <Slider
+                    value={[cascadingKeywordWeight]}
+                    onValueChange={(v) => form.setValue("cascading_fallback_keyword_weight", v[0])}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>벡터 가중치: {cascadingVectorWeight.toFixed(2)}</Label>
+                  <Slider
+                    value={[cascadingVectorWeight]}
+                    onValueChange={(v) => form.setValue("cascading_fallback_vector_weight", v[0])}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <Button type="submit" disabled={updateMutation.isPending}>
             <Save className="mr-2 h-4 w-4" />

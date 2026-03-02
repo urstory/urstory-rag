@@ -32,11 +32,29 @@ function getSteps(trace: PipelineTrace): StepInfo[] {
   if (trace.keyword_search) {
     steps.push({ key: "keyword_search", label: "키워드 검색", step: trace.keyword_search });
   }
+  if (trace.cascading_eval_stage1) {
+    steps.push({ key: "cascading_eval_stage1", label: "BM25 품질 평가", step: trace.cascading_eval_stage1 });
+  }
+  if (trace.query_expansion) {
+    steps.push({ key: "query_expansion", label: "쿼리 확장 (HyDE)", step: trace.query_expansion });
+  }
+  if (trace.keyword_search_expanded) {
+    steps.push({ key: "keyword_search_expanded", label: "확장 키워드 재검색", step: trace.keyword_search_expanded });
+  }
+  if (trace.cascading_eval_stage2) {
+    steps.push({ key: "cascading_eval_stage2", label: "확장 결과 품질 평가", step: trace.cascading_eval_stage2 });
+  }
+  if (trace.cascading_vector_fallback) {
+    steps.push({ key: "cascading_vector_fallback", label: "벡터 폴백 (RRF)", step: trace.cascading_vector_fallback });
+  }
   if (trace.rrf_fusion) {
     steps.push({ key: "rrf_fusion", label: "RRF 결합", step: trace.rrf_fusion });
   }
   if (trace.reranking) {
     steps.push({ key: "reranking", label: "리랭킹", step: trace.reranking });
+  }
+  if (trace.retrieval_gate) {
+    steps.push({ key: "retrieval_gate", label: "검색 품질 게이트", step: trace.retrieval_gate });
   }
   if (trace.guardrail_pii) {
     steps.push({ key: "guardrail_pii", label: "가드레일 (PII)", step: trace.guardrail_pii });

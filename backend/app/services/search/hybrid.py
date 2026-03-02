@@ -23,6 +23,8 @@ from app.services.guardrails.pii import KoreanPIIDetector
 from app.services.guardrails.retrieval_gate import RetrievalQualityGate
 from app.services.hyde.generator import HyDEGenerator
 from app.services.reranking.base import Reranker
+from app.services.search.cascading_evaluator import CascadingQualityEvaluator
+from app.services.search.query_expander import QueryExpander
 from app.services.search.rrf import RRFCombiner
 
 if TYPE_CHECKING:
@@ -45,6 +47,7 @@ class HybridSearchOrchestrator:
         hyde_generator: HyDEGenerator,
         llm: LLMProvider,
         langfuse_monitor: LangfuseMonitor | None = None,
+        query_expander: QueryExpander | None = None,
     ) -> None:
         self.embedder = embedder
         self.vector_engine = vector_engine
@@ -54,6 +57,7 @@ class HybridSearchOrchestrator:
         self.llm = llm
         self.rrf = RRFCombiner()
         self.langfuse = langfuse_monitor
+        self.query_expander = query_expander or QueryExpander(llm=llm)
 
         # 가드레일 (LLM이 필요한 것은 llm 공유)
         self.injection_detector = PromptInjectionDetector(llm=llm)
@@ -120,6 +124,12 @@ class HybridSearchOrchestrator:
         elif mode == "keyword":
             documents, step = await self._keyword_search(query, settings)
             trace.append(step)
+
+        elif mode == "cascading":
+            documents, cascading_steps = await self._cascading_search(
+                query, settings,
+            )
+            trace.extend(cascading_steps)
 
         else:  # hybrid
             vec_docs, vec_step, kw_docs, kw_step = await self._hybrid_search(
@@ -336,6 +346,100 @@ class HybridSearchOrchestrator:
             results_count=len(results),
         )
         return results, step
+
+    async def _cascading_search(
+        self,
+        query: str,
+        settings: RAGSettings,
+    ) -> tuple[list[SearchResult], list[PipelineStep]]:
+        """Cascading + Query Expansion 검색.
+
+        1. BM25 검색 → 품질 평가
+        2. 불충분 → HyDE 키워드 확장 → ES 재검색 → 품질 재평가
+        3. 여전히 불충분 → 벡터 폴백 (비대칭 RRF)
+        """
+        steps: list[PipelineStep] = []
+        evaluator = CascadingQualityEvaluator(
+            threshold=settings.cascading_bm25_threshold,
+            min_qualifying_docs=settings.cascading_min_qualifying_docs,
+            min_doc_score=settings.cascading_min_doc_score,
+        )
+
+        # ── Stage 1: BM25 검색 ──
+        kw_docs, kw_step = await self._keyword_search(query, settings)
+        steps.append(kw_step)
+
+        t0 = time.perf_counter()
+        eval1 = evaluator.evaluate(kw_docs)
+        steps.append(PipelineStep(
+            name="cascading_eval_stage1",
+            passed=eval1.sufficient,
+            duration_ms=_elapsed_ms(t0),
+            detail={"top_score": eval1.top_score, "qualifying": eval1.qualifying_count},
+        ))
+
+        if eval1.sufficient:
+            return kw_docs, steps
+
+        # ── Stage 2: Query Expansion (HyDE 키워드 확장) ──
+        if settings.query_expansion_enabled:
+            t0 = time.perf_counter()
+            expanded = await self.query_expander.expand(
+                query, max_keywords=settings.query_expansion_max_keywords,
+            )
+            steps.append(PipelineStep(
+                name="query_expansion",
+                passed=True,
+                duration_ms=_elapsed_ms(t0),
+                detail={"keywords": expanded.expanded_keywords},
+            ))
+
+            # 확장된 쿼리로 ES 재검색
+            expanded_docs, expanded_step = await self._keyword_search(
+                expanded.expanded_query, settings,
+            )
+            expanded_step = PipelineStep(
+                name="keyword_search_expanded",
+                passed=expanded_step.passed,
+                duration_ms=expanded_step.duration_ms,
+                results_count=expanded_step.results_count,
+            )
+            steps.append(expanded_step)
+
+            t0 = time.perf_counter()
+            eval2 = evaluator.evaluate(expanded_docs)
+            steps.append(PipelineStep(
+                name="cascading_eval_stage2",
+                passed=eval2.sufficient,
+                duration_ms=_elapsed_ms(t0),
+                detail={"top_score": eval2.top_score, "qualifying": eval2.qualifying_count},
+            ))
+
+            if eval2.sufficient:
+                return expanded_docs, steps
+
+        # ── Stage 3: 벡터 폴백 (비대칭 RRF) ──
+        vec_docs, vec_step, kw_docs2, kw_step2 = await self._hybrid_search(
+            query, query, settings,
+        )
+        steps.append(vec_step)
+        steps.append(kw_step2)
+
+        t0 = time.perf_counter()
+        documents = self.rrf.combine(
+            vec_docs, kw_docs2,
+            k=settings.rrf_constant,
+            vector_weight=settings.cascading_fallback_vector_weight,
+            keyword_weight=settings.cascading_fallback_keyword_weight,
+        )
+        steps.append(PipelineStep(
+            name="cascading_vector_fallback",
+            passed=True,
+            duration_ms=_elapsed_ms(t0),
+            results_count=len(documents),
+        ))
+
+        return documents, steps
 
     async def _hybrid_search(
         self,

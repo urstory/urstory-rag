@@ -98,6 +98,13 @@ class SettingsResponse(BaseModel):
     retriever_top_k: int
     hyde_enabled: bool
     hyde_model: str
+    cascading_bm25_threshold: float
+    cascading_min_qualifying_docs: int
+    cascading_min_doc_score: float
+    cascading_fallback_vector_weight: float
+    cascading_fallback_keyword_weight: float
+    query_expansion_enabled: bool
+    query_expansion_max_keywords: int
     guardrails: GuardrailsSettingsResponse
     pii_detection_enabled: bool
     injection_detection_enabled: bool
@@ -129,6 +136,13 @@ class SettingsUpdateRequest(BaseModel):
     retriever_top_k: int | None = None
     hyde_enabled: bool | None = None
     hyde_model: str | None = None
+    cascading_bm25_threshold: float | None = None
+    cascading_min_qualifying_docs: int | None = None
+    cascading_min_doc_score: float | None = None
+    cascading_fallback_vector_weight: float | None = None
+    cascading_fallback_keyword_weight: float | None = None
+    query_expansion_enabled: bool | None = None
+    query_expansion_max_keywords: int | None = None
     guardrails: dict | None = None
     pii_detection_enabled: bool | None = None
     injection_detection_enabled: bool | None = None

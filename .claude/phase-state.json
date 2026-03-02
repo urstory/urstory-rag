@@ -1,0 +1,9 @@
+{
+  "currentPhase": 10,
+  "featureName": "Cascading + Query Expansion 하이브리드 검색",
+  "branchName": "feature/phase-10",
+  "currentStep": 2,
+  "status": "in_progress",
+  "completedSteps": [1],
+  "startedAt": "2026-03-02T00:00:00Z"
+}

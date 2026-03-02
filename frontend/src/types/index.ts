@@ -60,7 +60,7 @@ export interface Chunk {
 export interface SearchRequest {
   query: string;
   top_k?: number;
-  search_mode?: "hybrid" | "vector" | "keyword";
+  search_mode?: "hybrid" | "vector" | "keyword" | "cascading";
   use_hyde?: boolean;
   use_reranking?: boolean;
   generate_answer?: boolean;
@@ -101,10 +101,17 @@ export interface PipelineTrace {
   hyde: PipelineStep;
   vector_search: PipelineStep;
   keyword_search: PipelineStep;
+  cascading_eval_stage1: PipelineStep;
+  query_expansion: PipelineStep;
+  keyword_search_expanded: PipelineStep;
+  cascading_eval_stage2: PipelineStep;
+  cascading_vector_fallback: PipelineStep;
   rrf_fusion: PipelineStep;
   reranking: PipelineStep;
+  retrieval_gate: PipelineStep;
   guardrail_pii: PipelineStep;
   generation: PipelineStep;
+  guardrail_faithfulness: PipelineStep;
   guardrail_hallucination: PipelineStep;
   total_duration_ms: number;
 }
@@ -127,11 +134,18 @@ export interface EmbeddingSettings {
 }
 
 export interface SearchSettings {
-  mode: "hybrid" | "vector" | "keyword";
+  mode: "hybrid" | "vector" | "keyword" | "cascading";
   keyword_engine: string;
   rrf_constant: number;
   vector_weight: number;
   keyword_weight: number;
+  cascading_bm25_threshold: number;
+  cascading_min_qualifying_docs: number;
+  cascading_min_doc_score: number;
+  cascading_fallback_vector_weight: number;
+  cascading_fallback_keyword_weight: number;
+  query_expansion_enabled: boolean;
+  query_expansion_max_keywords: number;
 }
 
 export interface RerankingSettings {

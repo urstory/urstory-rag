@@ -13,7 +13,7 @@ async def test_health_all_connected():
     with (
         patch("app.api.health.check_db", new_callable=AsyncMock, return_value=True),
         patch("app.api.health.check_elasticsearch", new_callable=AsyncMock, return_value=True),
-        patch("app.api.health.check_ollama", new_callable=AsyncMock, return_value=True),
+        patch("app.api.health.check_openai", new_callable=AsyncMock, return_value=True),
         patch("app.api.health.check_redis", new_callable=AsyncMock, return_value=True),
     ):
         async with AsyncClient(
@@ -26,7 +26,7 @@ async def test_health_all_connected():
     assert data["status"] == "ok"
     assert data["components"]["database"] == "connected"
     assert data["components"]["elasticsearch"] == "connected"
-    assert data["components"]["ollama"] == "connected"
+    assert data["components"]["openai"] == "connected"
     assert data["components"]["redis"] == "connected"
 
 
@@ -36,7 +36,7 @@ async def test_health_db_disconnected():
     with (
         patch("app.api.health.check_db", new_callable=AsyncMock, return_value=False),
         patch("app.api.health.check_elasticsearch", new_callable=AsyncMock, return_value=True),
-        patch("app.api.health.check_ollama", new_callable=AsyncMock, return_value=True),
+        patch("app.api.health.check_openai", new_callable=AsyncMock, return_value=True),
         patch("app.api.health.check_redis", new_callable=AsyncMock, return_value=True),
     ):
         async with AsyncClient(
@@ -57,7 +57,7 @@ async def test_health_multiple_disconnected():
     with (
         patch("app.api.health.check_db", new_callable=AsyncMock, return_value=False),
         patch("app.api.health.check_elasticsearch", new_callable=AsyncMock, return_value=False),
-        patch("app.api.health.check_ollama", new_callable=AsyncMock, return_value=True),
+        patch("app.api.health.check_openai", new_callable=AsyncMock, return_value=True),
         patch("app.api.health.check_redis", new_callable=AsyncMock, return_value=False),
     ):
         async with AsyncClient(
@@ -69,5 +69,5 @@ async def test_health_multiple_disconnected():
     data = response.json()
     assert data["components"]["database"] == "disconnected"
     assert data["components"]["elasticsearch"] == "disconnected"
-    assert data["components"]["ollama"] == "connected"
+    assert data["components"]["openai"] == "connected"
     assert data["components"]["redis"] == "disconnected"

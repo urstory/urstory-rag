@@ -98,6 +98,8 @@ export interface PipelineStep {
 
 export interface PipelineTrace {
   guardrail_input: PipelineStep;
+  question_classification: PipelineStep;
+  multi_query: PipelineStep;
   hyde: PipelineStep;
   vector_search: PipelineStep;
   keyword_search: PipelineStep;
@@ -110,7 +112,9 @@ export interface PipelineTrace {
   reranking: PipelineStep;
   retrieval_gate: PipelineStep;
   guardrail_pii: PipelineStep;
+  evidence_extraction: PipelineStep;
   generation: PipelineStep;
+  numeric_verification: PipelineStep;
   guardrail_faithfulness: PipelineStep;
   guardrail_hallucination: PipelineStep;
   total_duration_ms: number;
@@ -146,6 +150,8 @@ export interface SearchSettings {
   cascading_fallback_keyword_weight: number;
   query_expansion_enabled: boolean;
   query_expansion_max_keywords: number;
+  multi_query_enabled: boolean;
+  multi_query_count: number;
 }
 
 export interface RerankingSettings {
@@ -165,6 +171,8 @@ export interface GuardrailSettings {
   pii_detection: boolean;
   injection_detection: boolean;
   hallucination_detection: boolean;
+  exact_citation: boolean;
+  numeric_verification: boolean;
 }
 
 export interface GenerationSettings {

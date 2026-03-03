@@ -1,4 +1,3 @@
-import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,27 +37,20 @@ async def patch_settings(
 @router.get("/settings/models")
 async def get_available_models():
     env = get_env_settings()
-    models = {"ollama": [], "api": []}
+    models = {"openai": [], "embedding": []}
 
-    # Ollama 모델 조회
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{env.ollama_url}/api/tags", timeout=5.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                models["ollama"] = [m["name"] for m in data.get("models", [])]
-    except Exception:
-        pass
-
-    # API 모델
+    # OpenAI 모델
     if env.openai_api_key:
-        models["api"].append("gpt-4.1")
-        models["api"].append("gpt-4.1-mini")
-        models["api"].append("gpt-4.1-nano")
-        models["api"].append("gpt-4o")
-        models["api"].append("gpt-4o-mini")
-    if env.anthropic_api_key:
-        models["api"].append("claude-sonnet-4-6")
-        models["api"].append("claude-haiku-4-5")
+        models["openai"] = [
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4.1-nano",
+            "gpt-4o",
+            "gpt-4o-mini",
+        ]
+        models["embedding"] = [
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+        ]
 
     return models

@@ -33,8 +33,11 @@ async def main():
     # ES 현재 상태
     import httpx
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{settings.elasticsearch_url}/rag_chunks/_count")
-        print(f"ES 청크 수 (재인덱싱 전): {resp.json()['count']}")
+        try:
+            resp = await client.get(f"{settings.elasticsearch_url}/rag_chunks/_count")
+            print(f"ES 청크 수 (재인덱싱 전): {resp.json().get('count', 0)}")
+        except Exception:
+            print("ES 인덱스 없음 (새로 생성됩니다)")
 
     # RAG 설정 로드
     async with session_factory() as session:
@@ -42,8 +45,20 @@ async def main():
         settings_service._db = session
         rag_settings = await settings_service.get_settings()
 
-    embedding = OpenAIEmbedding(api_key=settings.openai_api_key)
+    embedding = OpenAIEmbedding(api_key=settings.openai_api_key, model=rag_settings.embedding_model, dimensions=1536)
     converter = DocumentConverter()
+
+    # Contextual Chunking LLM 프로바이더 (조건부 생성)
+    chunk_llm = None
+    if rag_settings.contextual_chunking_enabled:
+        from app.services.generation.openai import OpenAILLM
+        chunk_llm = OpenAILLM(
+            api_key=settings.openai_api_key,
+            model=rag_settings.contextual_chunking_model,
+        )
+        print(f"Contextual Chunking: ON (model={rag_settings.contextual_chunking_model})")
+    else:
+        print("Contextual Chunking: OFF")
 
     for i, (doc_id, file_path, filename) in enumerate(docs, 1):
         print(f"\n[{i}/{len(docs)}] {filename} (ID: {doc_id[:8]}...)")
@@ -59,6 +74,9 @@ async def main():
                 db_session=session,
                 chunking_strategy=rag_settings.chunking_strategy,
                 embedder=embedding,
+                llm_provider=chunk_llm,
+                contextual_chunking_enabled=rag_settings.contextual_chunking_enabled,
+                contextual_chunking_max_doc_chars=rag_settings.contextual_chunking_max_doc_chars,
             )
             try:
                 await processor.process(doc_id, file_path)
@@ -68,8 +86,11 @@ async def main():
 
     # ES 최종 상태
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{settings.elasticsearch_url}/rag_chunks/_count")
-        print(f"\nES 청크 수 (재인덱싱 후): {resp.json()['count']}")
+        try:
+            resp = await client.get(f"{settings.elasticsearch_url}/rag_chunks/_count")
+            print(f"\nES 청크 수 (재인덱싱 후): {resp.json().get('count', 0)}")
+        except Exception:
+            print("\nES 청크 수 확인 실패")
 
     await engine.dispose()
     print("완료!")

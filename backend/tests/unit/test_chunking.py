@@ -167,6 +167,38 @@ class TestContextualChunking:
             assert chunk.content.startswith("맥락\n\n")
 
 
+class TestContextualChunkingPathFormat:
+    @pytest.mark.asyncio
+    async def test_context_follows_path_format(self):
+        """생성된 컨텍스트가 '>' 구분 경로 형식을 따른다."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "한국어 NLP > 기본 기술 > 형태소 분석, 임베딩"
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(LONG_TEXT)
+
+        for chunk in chunks:
+            # 컨텍스트가 > 구분자를 포함해야 함
+            context_line = chunk.content.split("\n\n")[0]
+            assert ">" in context_line
+
+    @pytest.mark.asyncio
+    async def test_context_includes_document_topic(self):
+        """경로에 문서 주제가 포함된다."""
+        mock_llm = AsyncMock()
+        mock_llm.generate.return_value = "한국어 NLP 기술 > 검색 > 하이브리드 검색, BM25"
+        base = RecursiveChunking(chunk_size=100, chunk_overlap=20)
+
+        chunker = ContextualChunking(llm_provider=mock_llm, base_strategy=base)
+        chunks = await chunker.chunk(LONG_TEXT)
+
+        assert len(chunks) >= 1
+        # 첫 번째 청크의 컨텍스트에 주제가 포함
+        context_line = chunks[0].content.split("\n\n")[0]
+        assert "한국어 NLP" in context_line
+
+
 MARKDOWN_TEXT = """# 블루멤버스 안내
 
 블루멤버스는 현대자동차의 고객 포인트 프로그램입니다.

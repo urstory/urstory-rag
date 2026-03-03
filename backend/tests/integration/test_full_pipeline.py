@@ -334,8 +334,8 @@ class TestSystemIntegration:
         resp = await integ_client.get("/api/settings/models")
         assert resp.status_code == 200
         data = resp.json()
-        assert "ollama" in data
-        assert "api" in data
+        assert "openai" in data
+        assert "embedding" in data
 
     @pytest.mark.asyncio
     async def test_watcher_status(self, integ_client, integ_db):

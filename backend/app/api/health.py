@@ -34,12 +34,18 @@ async def check_elasticsearch() -> bool:
         return False
 
 
-async def check_ollama() -> bool:
-    """Ollama GET /api/tags 호출."""
+async def check_openai() -> bool:
+    """OpenAI API 키 유효성 확인."""
     try:
         settings = get_settings()
+        if not settings.openai_api_key:
+            return False
         async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{settings.ollama_url}/api/tags", timeout=5.0)
+            resp = await client.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                timeout=5.0,
+            )
             return resp.status_code == 200
     except Exception:
         return False
@@ -63,7 +69,7 @@ async def check_redis() -> bool:
 async def health_check():
     db_ok = await check_db()
     es_ok = await check_elasticsearch()
-    ollama_ok = await check_ollama()
+    openai_ok = await check_openai()
     redis_ok = await check_redis()
 
     return {
@@ -71,7 +77,7 @@ async def health_check():
         "components": {
             "database": "connected" if db_ok else "disconnected",
             "elasticsearch": "connected" if es_ok else "disconnected",
-            "ollama": "connected" if ollama_ok else "disconnected",
+            "openai": "connected" if openai_ok else "disconnected",
             "redis": "connected" if redis_ok else "disconnected",
         },
     }

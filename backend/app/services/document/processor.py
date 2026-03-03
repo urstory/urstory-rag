@@ -73,7 +73,22 @@ class DocumentProcessor:
             ) if self.embedder else AutoDetectChunking(),
         }
         factory = strategies.get(self.chunking_strategy, strategies["auto"])
-        return factory()
+        base_strategy = factory()
+
+        # contextual chunking은 모든 전략에 데코레이터로 적용
+        if (
+            self.contextual_chunking_enabled
+            and self.llm_provider
+            and not isinstance(base_strategy, AutoDetectChunking)
+        ):
+            from app.services.chunking.contextual import ContextualChunking
+            return ContextualChunking(
+                self.llm_provider,
+                base_strategy,
+                max_doc_chars=self.contextual_chunking_max_doc_chars,
+            )
+
+        return base_strategy
 
     async def _update_status(
         self, doc_id: str, status: DocumentStatus, chunk_count: int | None = None

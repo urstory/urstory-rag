@@ -89,9 +89,9 @@ def test_retrieval_gate_defaults():
     assert rag.retrieval_quality_gate_enabled is True
     gate = rag.guardrails.retrieval_gate
     assert gate.enabled is True
-    assert gate.min_top_score == 0.05
+    assert gate.min_top_score == 0.3
     assert gate.min_doc_count == 1
-    assert gate.min_doc_score == 0.1
+    assert gate.min_doc_score == 0.2
     assert "찾지 못했습니다" in gate.not_found_message
 
 
@@ -193,3 +193,31 @@ def test_cascading_settings_in_hybrid_mode_unchanged():
     assert rag.search_mode == "hybrid"
     # cascading 설정은 기본값으로 존재
     assert rag.cascading_bm25_threshold == 3.0
+
+
+def test_multi_query_settings_defaults():
+    """Phase 11 멀티쿼리/정확 인용/숫자 검증 설정 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.multi_query_enabled is True
+    assert rag.multi_query_count == 4
+    assert rag.multi_query_model == "gpt-4.1-mini"
+    assert rag.exact_citation_enabled is True
+    assert rag.numeric_verification_enabled is True
+
+
+def test_multi_query_settings_custom():
+    """Phase 11 설정 커스텀 값."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(
+        multi_query_enabled=False,
+        multi_query_count=6,
+        exact_citation_enabled=False,
+        numeric_verification_enabled=False,
+    )
+    assert rag.multi_query_enabled is False
+    assert rag.multi_query_count == 6
+    assert rag.exact_citation_enabled is False
+    assert rag.numeric_verification_enabled is False

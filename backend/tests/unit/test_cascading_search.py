@@ -65,7 +65,7 @@ def mock_keyword_engine_low(low_score_results):
 def mock_reranker():
     m = AsyncMock()
 
-    async def _rerank(query, documents, top_k=5):
+    async def _rerank(query, documents, top_k=5, **kwargs):
         return documents[:top_k]
 
     m.rerank.side_effect = _rerank
@@ -122,6 +122,10 @@ def cascading_settings() -> RAGSettings:
         hallucination_detection_enabled=False,
         retrieval_quality_gate_enabled=False,
         faithfulness_enabled=False,
+        # Phase 11: 기존 테스트 격리
+        multi_query_enabled=False,
+        exact_citation_enabled=False,
+        numeric_verification_enabled=False,
     )
 
 

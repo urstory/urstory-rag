@@ -58,6 +58,8 @@ async def _apply_overrides(
         overrides["hyde_enabled"] = request.hyde_enabled
     if request.reranking_enabled is not None:
         overrides["reranking_enabled"] = request.reranking_enabled
+    if request.multi_query_enabled is not None:
+        overrides["multi_query_enabled"] = request.multi_query_enabled
     if request.top_k is not None:
         overrides["reranker_top_k"] = request.top_k
 

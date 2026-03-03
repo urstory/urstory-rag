@@ -50,9 +50,10 @@ class HallucinationDetectionSettings(BaseModel):
 class RetrievalGateSettings(BaseModel):
     """검색 품질 게이트 설정."""
     enabled: bool = True
-    min_top_score: float = 0.05
+    min_top_score: float = 0.3
     min_doc_count: int = 1
-    min_doc_score: float = 0.1
+    min_doc_score: float = 0.2
+    soft_mode: bool = True
     not_found_message: str = "관련 문서를 충분히 찾지 못했습니다. 다른 키워드로 검색해 주세요."
 
 
@@ -99,6 +100,8 @@ class RAGSettings(BaseModel):
     reranker_model: str = "dragonkue/bge-reranker-v2-m3-ko"
     reranker_top_k: int = 8
     retriever_top_k: int = 20
+    reranker_score_mode: str = "calibrated"  # "calibrated" | "replace"
+    reranker_alpha: float = 0.7  # calibrated 모드에서 CE 가중치
 
     # HyDE
     hyde_enabled: bool = True
@@ -112,6 +115,21 @@ class RAGSettings(BaseModel):
     cascading_fallback_keyword_weight: float = 0.7
     query_expansion_enabled: bool = True
     query_expansion_max_keywords: int = 10
+
+    # 문서 스코프 선택
+    document_scope_enabled: bool = True
+    document_scope_top_n: int = 3
+
+    # 멀티쿼리
+    multi_query_enabled: bool = True
+    multi_query_count: int = 4
+    multi_query_model: str = "gpt-4.1-mini"
+
+    # 정확 인용 모드
+    exact_citation_enabled: bool = True
+
+    # 숫자 검증 가드레일
+    numeric_verification_enabled: bool = True
 
     # 가드레일 (세부 설정)
     guardrails: GuardrailsSettings = GuardrailsSettings()

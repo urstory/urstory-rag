@@ -19,4 +19,6 @@ class Reranker(Protocol):
         query: str,
         documents: list[SearchResult],
         top_k: int = 5,
+        score_mode: str = "calibrated",
+        alpha: float = 0.7,
     ) -> list[SearchResult]: ...

@@ -16,6 +16,8 @@ const guardrailsSchema = z.object({
   pii_detection: z.boolean(),
   injection_detection: z.boolean(),
   hallucination_detection: z.boolean(),
+  exact_citation: z.boolean(),
+  numeric_verification: z.boolean(),
 });
 
 type GuardrailsFormData = z.infer<typeof guardrailsSchema>;
@@ -30,6 +32,8 @@ export function GuardrailsForm() {
       pii_detection: true,
       injection_detection: true,
       hallucination_detection: true,
+      exact_citation: true,
+      numeric_verification: true,
     },
   });
 
@@ -92,6 +96,36 @@ export function GuardrailsForm() {
               <Switch
                 checked={form.watch("hallucination_detection")}
                 onCheckedChange={(v) => form.setValue("hallucination_detection", v)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>정확 인용 모드</Label>
+                <p className="text-xs text-muted-foreground">
+                  규정형 질문(횟수, 기간 등)에 대해 근거 기반 답변 생성
+                </p>
+              </div>
+              <Switch
+                checked={form.watch("exact_citation")}
+                onCheckedChange={(v) => form.setValue("exact_citation", v)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>숫자 검증</Label>
+                <p className="text-xs text-muted-foreground">
+                  답변의 숫자가 참조 문서에 존재하는지 검증
+                </p>
+              </div>
+              <Switch
+                checked={form.watch("numeric_verification")}
+                onCheckedChange={(v) => form.setValue("numeric_verification", v)}
               />
             </div>
           </div>

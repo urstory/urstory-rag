@@ -45,7 +45,7 @@ def _make_orchestrator(
     keyword_engine.search.return_value = docs
 
     reranker = AsyncMock()
-    reranker.rerank.side_effect = lambda q, documents, top_k=5: documents[:top_k]
+    reranker.rerank.side_effect = lambda q, documents, top_k=5, **kwargs: documents[:top_k]
 
     hyde = MagicMock()
     hyde.should_apply.return_value = False

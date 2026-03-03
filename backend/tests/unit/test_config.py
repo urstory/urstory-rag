@@ -89,9 +89,9 @@ def test_retrieval_gate_defaults():
     assert rag.retrieval_quality_gate_enabled is True
     gate = rag.guardrails.retrieval_gate
     assert gate.enabled is True
-    assert gate.min_top_score == 0.05
+    assert gate.min_top_score == 0.3
     assert gate.min_doc_count == 1
-    assert gate.min_doc_score == 0.1
+    assert gate.min_doc_score == 0.2
     assert "찾지 못했습니다" in gate.not_found_message
 
 

@@ -72,7 +72,7 @@ def orchestrator_with_tracing(mock_langfuse_monitor):
 
     mock_reranker = AsyncMock()
 
-    async def _rerank(query, documents, top_k=5):
+    async def _rerank(query, documents, top_k=5, **kwargs):
         return documents[:top_k]
 
     mock_reranker.rerank.side_effect = _rerank
@@ -162,7 +162,7 @@ class TestSearchTracing:
         mock_keyword = AsyncMock()
         mock_keyword.search.return_value = [_make_result(UUID_B, 5.0)]
         mock_reranker = AsyncMock()
-        mock_reranker.rerank.side_effect = lambda q, d, top_k=5: d[:top_k]
+        mock_reranker.rerank.side_effect = lambda q, d, top_k=5, **kwargs: d[:top_k]
         mock_hyde = MagicMock()
         mock_hyde.should_apply.return_value = False
         mock_llm = AsyncMock()

@@ -32,7 +32,7 @@ def mock_deps():
 
     reranker = AsyncMock()
 
-    def _rerank_with_scores(q, docs, top_k=5):
+    def _rerank_with_scores(q, docs, top_k=5, **kwargs):
         """크로스인코더 리랭커 모사: 새 관련성 점수 부여."""
         return [
             SearchResult(
@@ -251,7 +251,7 @@ class TestPipelineWithRetrievalGate:
         low_score_doc = _result("관련 없는 문서", score=0.01)
         vector_engine.search.return_value = [low_score_doc]
         keyword_engine.search.return_value = [low_score_doc]
-        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+        reranker.rerank.side_effect = lambda q, docs, top_k=5, **kwargs: [
             SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
                          content=d.content, score=0.01, metadata=d.metadata)
             for d in docs[:top_k]
@@ -291,7 +291,7 @@ class TestPipelineWithRetrievalGate:
         low_score_doc = _result("관련 없는 문서", score=0.1)
         vector_engine.search.return_value = [low_score_doc]
         keyword_engine.search.return_value = [low_score_doc]
-        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+        reranker.rerank.side_effect = lambda q, docs, top_k=5, **kwargs: [
             SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
                          content=d.content, score=0.1, metadata=d.metadata)
             for d in docs[:top_k]
@@ -319,7 +319,7 @@ class TestRetrievalGateSoftFail:
         low_score_doc = _result("자원봉사자 활동 중 인정되지 않는 봉사활동은 가족이 수행하는 봉사입니다.", score=0.09)
         vector_engine.search.return_value = [low_score_doc]
         keyword_engine.search.return_value = [low_score_doc]
-        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+        reranker.rerank.side_effect = lambda q, docs, top_k=5, **kwargs: [
             SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
                          content=d.content, score=0.09, metadata=d.metadata)
             for d in docs[:top_k]
@@ -359,7 +359,7 @@ class TestRetrievalGateSoftFail:
         low_score_doc = _result("완전히 관련 없는 문서 내용", score=0.02)
         vector_engine.search.return_value = [low_score_doc]
         keyword_engine.search.return_value = [low_score_doc]
-        reranker.rerank.side_effect = lambda q, docs, top_k=5: [
+        reranker.rerank.side_effect = lambda q, docs, top_k=5, **kwargs: [
             SearchResult(chunk_id=d.chunk_id, document_id=d.document_id,
                          content=d.content, score=0.02, metadata=d.metadata)
             for d in docs[:top_k]

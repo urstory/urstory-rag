@@ -215,6 +215,8 @@ class HybridSearchOrchestrator:
             t0 = time.perf_counter()
             documents = await self.reranker.rerank(
                 query, documents, top_k=settings.reranker_top_k,
+                score_mode=settings.reranker_score_mode,
+                alpha=settings.reranker_alpha,
             )
             trace.append(PipelineStep(
                 name="reranking",

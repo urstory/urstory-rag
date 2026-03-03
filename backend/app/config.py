@@ -50,9 +50,9 @@ class HallucinationDetectionSettings(BaseModel):
 class RetrievalGateSettings(BaseModel):
     """검색 품질 게이트 설정."""
     enabled: bool = True
-    min_top_score: float = 0.05
+    min_top_score: float = 0.3
     min_doc_count: int = 1
-    min_doc_score: float = 0.1
+    min_doc_score: float = 0.2
     soft_mode: bool = True
     not_found_message: str = "관련 문서를 충분히 찾지 못했습니다. 다른 키워드로 검색해 주세요."
 
@@ -100,6 +100,8 @@ class RAGSettings(BaseModel):
     reranker_model: str = "dragonkue/bge-reranker-v2-m3-ko"
     reranker_top_k: int = 8
     retriever_top_k: int = 20
+    reranker_score_mode: str = "calibrated"  # "calibrated" | "replace"
+    reranker_alpha: float = 0.7  # calibrated 모드에서 CE 가중치
 
     # HyDE
     hyde_enabled: bool = True

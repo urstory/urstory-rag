@@ -61,7 +61,7 @@ def mock_keyword_engine(keyword_results):
 def mock_reranker():
     m = AsyncMock()
 
-    async def _rerank(query, documents, top_k=5):
+    async def _rerank(query, documents, top_k=5, **kwargs):
         return documents[:top_k]
 
     m.rerank.side_effect = _rerank

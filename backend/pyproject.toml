@@ -3,6 +3,11 @@ name = "urstory-rag"
 version = "0.1.0"
 requires-python = ">=3.12"
 description = "Korean RAG Production System"
+authors = [{name = "김성박", email = "urstory@fullstackfamily.com"}]
+license = {text = "MIT"}
+readme = "../README.md"
+repository = "https://github.com/urstory/urstory-rag"
+keywords = ["rag", "korean", "nlp", "haystack", "fastapi", "elasticsearch", "nori"]
 
 dependencies = [
     # 웹
@@ -57,6 +62,11 @@ dependencies = [
     "pydantic-settings>=2.7",
     "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/urstory/urstory-rag"
+Repository = "https://github.com/urstory/urstory-rag"
+Issues = "https://github.com/urstory/urstory-rag/issues"
 
 [project.optional-dependencies]
 dev = [

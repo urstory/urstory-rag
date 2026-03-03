@@ -41,14 +41,13 @@ urstory_rag/
 │   │   │   │   ├── base.py        # ChunkingStrategy 인터페이스
 │   │   │   │   ├── recursive.py   # 재귀적 문자 분할
 │   │   │   │   ├── semantic.py    # 시맨틱 청킹
-│   │   │   │   ├── contextual.py  # Contextual Retrieval
-│   │   │   │   └── auto_detect.py # 자동 감지
+│   │   │   │   ├── contextual.py  # Contextual Retrieval 청킹
+│   │   │   │   └── auto_detect.py # 파일 유형별 자동 전략 감지
 │   │   │   │
 │   │   │   ├── embedding/         # 임베딩 프로바이더
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── base.py        # EmbeddingProvider 인터페이스
-│   │   │   │   ├── ollama.py      # Ollama (bge-m3, BGE-m3-ko)
-│   │   │   │   └── openai.py      # OpenAI API
+│   │   │   │   └── openai.py      # OpenAI API (text-embedding-3-small)
 │   │   │   │
 │   │   │   ├── search/            # 검색 엔진
 │   │   │   │   ├── __init__.py
@@ -56,7 +55,12 @@ urstory_rag/
 │   │   │   │   ├── vector.py      # PGVector 벡터 검색
 │   │   │   │   ├── keyword_es.py  # Elasticsearch + Nori BM25
 │   │   │   │   ├── keyword_kiwi.py # kiwipiepy + rank-bm25 (대안)
-│   │   │   │   └── rrf.py         # Reciprocal Rank Fusion
+│   │   │   │   ├── rrf.py         # Reciprocal Rank Fusion
+│   │   │   │   ├── multi_query.py # 멀티쿼리 구조분해
+│   │   │   │   ├── question_classifier.py # 질문 유형 분류
+│   │   │   │   ├── query_expander.py     # 쿼리 확장
+│   │   │   │   ├── cascading_evaluator.py # 캐스케이딩 품질 평가
+│   │   │   │   └── document_scope.py     # 문서 범위 필터링
 │   │   │   │
 │   │   │   ├── reranking/         # 리랭킹
 │   │   │   │   ├── __init__.py
@@ -70,15 +74,17 @@ urstory_rag/
 │   │   │   ├── generation/        # 답변 생성
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── base.py        # LLMProvider 인터페이스
-│   │   │   │   ├── ollama.py      # Ollama LLM
 │   │   │   │   ├── openai.py      # OpenAI API
-│   │   │   │   └── claude.py      # Claude API
+│   │   │   │   └── evidence_extractor.py # 정확 인용 근거 추출
 │   │   │   │
 │   │   │   ├── guardrails/        # 가드레일
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── pii.py         # 한국어 PII 탐지
 │   │   │   │   ├── injection.py   # 프롬프트 인젝션 방어
-│   │   │   │   └── hallucination.py # 할루시네이션 탐지
+│   │   │   │   ├── hallucination.py # 할루시네이션 탐지
+│   │   │   │   ├── faithfulness.py  # 충실도 검증 (LLM-as-Judge)
+│   │   │   │   ├── retrieval_gate.py # 검색 품질 게이트
+│   │   │   │   └── numeric_verifier.py # 숫자 검증
 │   │   │   │
 │   │   │   ├── evaluation/        # 품질 평가
 │   │   │   │   ├── __init__.py
@@ -183,12 +189,12 @@ class Settings(BaseSettings):
     # 인프라 (환경 변수)
     database_url: str
     elasticsearch_url: str
-    ollama_url: str = "http://localhost:11434"
     redis_url: str = "redis://localhost:6379"
 
-    # 외부 API (환경 변수)
-    openai_api_key: str | None = None
-    anthropic_api_key: str | None = None
+    # OpenAI API (필수)
+    openai_api_key: str
+
+    # 모니터링 (환경 변수)
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
 ```
@@ -202,8 +208,8 @@ class RAGSettings:
     chunk_overlap: int = 50
 
     # 임베딩
-    embedding_provider: str = "ollama"  # ollama | openai
-    embedding_model: str = "bge-m3"
+    embedding_provider: str = "openai"  # openai
+    embedding_model: str = "text-embedding-3-small"
 
     # 검색
     search_mode: str = "hybrid"  # vector | keyword | hybrid
@@ -220,7 +226,7 @@ class RAGSettings:
 
     # HyDE
     hyde_enabled: bool = True
-    hyde_model: str = "qwen2.5:7b"
+    hyde_model: str = "gpt-4.1-mini"
 
     # 가드레일
     pii_detection_enabled: bool = True
@@ -228,7 +234,34 @@ class RAGSettings:
     hallucination_detection_enabled: bool = True
 
     # 답변 생성
-    llm_provider: str = "ollama"  # ollama | openai | anthropic
-    llm_model: str = "qwen2.5:7b"
+    llm_provider: str = "openai"  # openai
+    llm_model: str = "gpt-4.1-mini"
     system_prompt: str = "..."
+
+    # 멀티쿼리 / 쿼리 확장
+    multi_query_enabled: bool = True
+    multi_query_max_sub_queries: int = 3
+    query_expansion_enabled: bool = True
+    query_expansion_synonyms: bool = True
+
+    # 캐스케이딩 평가
+    cascading_enabled: bool = True
+    cascading_min_score: float = 0.3
+    cascading_max_retries: int = 2
+
+    # 정확 인용 / 숫자 검증
+    exact_citation_enabled: bool = False
+    numeric_verification_enabled: bool = True
+
+    # Contextual Chunking
+    contextual_chunking_enabled: bool = True
+    contextual_chunking_model: str = "gpt-4.1-mini"
+
+    # 문서 범위 필터링
+    document_scope_enabled: bool = True
+    document_scope_max_docs: int = 5
+
+    # 리랭커 점수 모드
+    reranker_score_mode: str = "calibrated"  # raw | calibrated
+    reranker_alpha: float = 0.7  # sigmoid 캘리브레이션 + 순위 신호 결합 가중치
 ```

@@ -23,7 +23,7 @@ interface SearchInputProps {
 
 export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<"hybrid" | "vector" | "keyword">("hybrid");
+  const [searchMode, setSearchMode] = useState<"hybrid" | "vector" | "keyword" | "cascading">("hybrid");
   const [useHyde, setUseHyde] = useState(true);
   const [useReranking, setUseReranking] = useState(true);
   const [topK, setTopK] = useState(5);
@@ -34,8 +34,8 @@ export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
     onSearch({
       query: query.trim(),
       search_mode: searchMode,
-      use_hyde: useHyde,
-      use_reranking: useReranking,
+      hyde_enabled: useHyde,
+      reranking_enabled: useReranking,
       top_k: topK,
       generate_answer: true,
     });
@@ -68,6 +68,7 @@ export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
               <SelectItem value="hybrid">하이브리드</SelectItem>
               <SelectItem value="vector">벡터</SelectItem>
               <SelectItem value="keyword">키워드</SelectItem>
+              <SelectItem value="cascading">캐스캐이딩</SelectItem>
             </SelectContent>
           </Select>
         </div>

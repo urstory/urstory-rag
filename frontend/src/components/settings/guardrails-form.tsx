@@ -23,23 +23,29 @@ const guardrailsSchema = z.object({
 type GuardrailsFormData = z.infer<typeof guardrailsSchema>;
 
 export function GuardrailsForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<GuardrailsFormData>({
     resolver: zodResolver(guardrailsSchema),
-    values: settings?.guardrails ?? {
-      pii_detection: true,
-      injection_detection: true,
-      hallucination_detection: true,
-      exact_citation: true,
-      numeric_verification: true,
+    values: {
+      pii_detection: settings?.pii_detection_enabled ?? true,
+      injection_detection: settings?.injection_detection_enabled ?? true,
+      hallucination_detection: settings?.hallucination_detection_enabled ?? true,
+      exact_citation: settings?.exact_citation_enabled ?? true,
+      numeric_verification: settings?.numeric_verification_enabled ?? true,
     },
   });
 
   const onSubmit = async (data: GuardrailsFormData) => {
     try {
-      await updateMutation.mutateAsync({ guardrails: data });
+      await updateMutation.mutateAsync({
+        pii_detection_enabled: data.pii_detection,
+        injection_detection_enabled: data.injection_detection,
+        hallucination_detection_enabled: data.hallucination_detection,
+        exact_citation_enabled: data.exact_citation,
+        numeric_verification_enabled: data.numeric_verification,
+      });
       toast.success("가드레일 설정이 저장되었습니다.");
     } catch {
       toast.error("설정 저장에 실패했습니다.");
@@ -47,6 +53,7 @@ export function GuardrailsForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   return (
     <Card>

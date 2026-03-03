@@ -13,10 +13,10 @@ export function SearchResults({ data }: SearchResultsProps) {
 
   return (
     <div data-testid="search-results" className="space-y-4">
-      {data.pipeline_trace && (
-        <PipelineTraceView trace={data.pipeline_trace} />
+      {data.pipeline_trace && data.pipeline_trace.length > 0 && (
+        <PipelineTraceView steps={data.pipeline_trace} />
       )}
-      <AnswerView answer={data.answer} documents={data.documents} />
+      <AnswerView answer={data.answer} results={data.results} />
     </div>
   );
 }

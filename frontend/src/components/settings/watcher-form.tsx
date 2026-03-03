@@ -26,6 +26,7 @@ import {
   useStopWatcher,
   useScanWatcher,
 } from "@/lib/queries";
+import type { RAGSettings } from "@/types";
 import { toast } from "sonner";
 import { Save, Plus, Trash2, Play, Square, RefreshCw } from "lucide-react";
 
@@ -41,7 +42,7 @@ const watcherSchema = z.object({
 type WatcherFormData = z.infer<typeof watcherSchema>;
 
 export function WatcherForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
   const { data: watcherStatus } = useWatcherStatus();
   const startMutation = useStartWatcher();
@@ -51,36 +52,22 @@ export function WatcherForm() {
   const form = useForm<WatcherFormData>({
     resolver: zodResolver(watcherSchema),
     values: {
-      enabled: settings?.watcher?.enabled ?? false,
-      directories: (settings?.watcher?.directories ?? []).map((d) => ({ value: d })),
-      use_polling: settings?.watcher?.use_polling ?? false,
-      polling_interval: settings?.watcher?.polling_interval ?? 60,
-      auto_delete: settings?.watcher?.auto_delete ?? false,
-      file_patterns: (settings?.watcher?.file_patterns ?? ["*.pdf", "*.docx", "*.txt", "*.md"]).map(
-        (p) => ({ value: p }),
-      ),
+      enabled: false,
+      directories: [],
+      use_polling: false,
+      polling_interval: 60,
+      auto_delete: false,
+      file_patterns: ["*.pdf", "*.docx", "*.txt", "*.md"].map((p) => ({ value: p })),
     },
   });
 
   const dirFields = useFieldArray({ control: form.control, name: "directories" });
   const patternFields = useFieldArray({ control: form.control, name: "file_patterns" });
 
-  const onSubmit = async (data: WatcherFormData) => {
-    try {
-      await updateMutation.mutateAsync({
-        watcher: {
-          enabled: data.enabled,
-          directories: data.directories.map((d) => d.value),
-          use_polling: data.use_polling,
-          polling_interval: data.polling_interval,
-          auto_delete: data.auto_delete,
-          file_patterns: data.file_patterns.map((p) => p.value),
-        },
-      });
-      toast.success("감시 설정이 저장되었습니다.");
-    } catch {
-      toast.error("설정 저장에 실패했습니다.");
-    }
+  const onSubmit = async (_data: WatcherFormData) => {
+    // 감시 설정은 별도 watcher API(start/stop/scan)로 관리됩니다.
+    // settings API와 연결되지 않으므로 저장은 동작하지 않습니다.
+    toast.info("감시 설정은 시작/중지 버튼으로 제어하세요.");
   };
 
   const handleStart = async () => {
@@ -111,6 +98,7 @@ export function WatcherForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   const usePolling = form.watch("use_polling");
   const pollingInterval = form.watch("polling_interval");
@@ -122,8 +110,8 @@ export function WatcherForm() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>감시 상태</span>
-            <Badge variant={watcherStatus?.status === "running" ? "default" : "outline"}>
-              {watcherStatus?.status === "running" ? "실행 중" : "중지됨"}
+            <Badge variant={watcherStatus?.running ? "default" : "outline"}>
+              {watcherStatus?.running ? "실행 중" : "중지됨"}
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -133,7 +121,7 @@ export function WatcherForm() {
               variant="outline"
               size="sm"
               onClick={handleStart}
-              disabled={startMutation.isPending || watcherStatus?.status === "running"}
+              disabled={startMutation.isPending || watcherStatus?.running === true}
             >
               <Play className="mr-2 h-4 w-4" />
               시작
@@ -142,7 +130,7 @@ export function WatcherForm() {
               variant="outline"
               size="sm"
               onClick={handleStop}
-              disabled={stopMutation.isPending || watcherStatus?.status !== "running"}
+              disabled={stopMutation.isPending || !watcherStatus?.running}
             >
               <Square className="mr-2 h-4 w-4" />
               중지
@@ -160,16 +148,12 @@ export function WatcherForm() {
           {watcherStatus && (
             <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
               <div>
-                <p className="text-muted-foreground">감시 파일 수</p>
-                <p className="font-medium">{watcherStatus.watched_file_count}</p>
+                <p className="text-muted-foreground">상태</p>
+                <p className="font-medium">{watcherStatus.running ? "실행 중" : "중지됨"}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">동기화 완료</p>
-                <p className="font-medium">{watcherStatus.stats.total_synced}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">대기 중</p>
-                <p className="font-medium">{watcherStatus.stats.pending}</p>
+                <p className="text-muted-foreground">감시 디렉토리</p>
+                <p className="font-medium">{watcherStatus.directories?.length ?? 0}개</p>
               </div>
             </div>
           )}

@@ -34,21 +34,19 @@ export default function DatasetsPage() {
 
   const handleCreate = useCallback(async () => {
     if (!file || !name.trim()) return;
-    const formData = new FormData();
-    formData.append("name", name.trim());
-    formData.append("description", description.trim());
-    formData.append("file", file);
     try {
-      await createMutation.mutateAsync(formData);
+      const text = await file.text();
+      const items = JSON.parse(text) as Record<string, unknown>[];
+      await createMutation.mutateAsync({ name: name.trim(), items });
       toast.success("데이터셋이 생성되었습니다.");
       setOpen(false);
       setName("");
       setDescription("");
       setFile(null);
     } catch {
-      toast.error("데이터셋 생성에 실패했습니다.");
+      toast.error("데이터셋 생성에 실패했습니다. JSON 형식을 확인하세요.");
     }
-  }, [file, name, description, createMutation]);
+  }, [file, name, createMutation]);
 
   return (
     <div className="space-y-6">
@@ -139,10 +137,10 @@ export default function DatasetsPage() {
               data.items.map((ds) => (
                 <TableRow key={ds.id}>
                   <TableCell className="font-medium">{ds.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{ds.description || "-"}</TableCell>
-                  <TableCell className="text-right">{ds.qa_count}</TableCell>
+                  <TableCell className="text-muted-foreground">-</TableCell>
+                  <TableCell className="text-right">{ds.items?.length ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    {new Date(ds.created_at).toLocaleDateString("ko-KR")}
+                    {ds.created_at ? new Date(ds.created_at).toLocaleDateString("ko-KR") : "-"}
                   </TableCell>
                 </TableRow>
               ))

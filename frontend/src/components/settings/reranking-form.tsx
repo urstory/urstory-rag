@@ -22,22 +22,27 @@ const rerankingSchema = z.object({
 type RerankingFormData = z.infer<typeof rerankingSchema>;
 
 export function RerankingForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<RerankingFormData>({
     resolver: zodResolver(rerankingSchema),
-    values: settings?.reranking ?? {
-      enabled: true,
-      model: "dragonkue/bge-reranker-v2-m3-ko",
-      top_k: 5,
-      retriever_top_k: 20,
+    values: {
+      enabled: settings?.reranking_enabled ?? true,
+      model: settings?.reranker_model ?? "dragonkue/bge-reranker-v2-m3-ko",
+      top_k: settings?.reranker_top_k ?? 5,
+      retriever_top_k: settings?.retriever_top_k ?? 20,
     },
   });
 
   const onSubmit = async (data: RerankingFormData) => {
     try {
-      await updateMutation.mutateAsync({ reranking: data });
+      await updateMutation.mutateAsync({
+        reranking_enabled: data.enabled,
+        reranker_model: data.model,
+        reranker_top_k: data.top_k,
+        retriever_top_k: data.retriever_top_k,
+      });
       toast.success("리랭킹 설정이 저장되었습니다.");
     } catch {
       toast.error("설정 저장에 실패했습니다.");
@@ -45,6 +50,7 @@ export function RerankingForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   return (
     <Card>

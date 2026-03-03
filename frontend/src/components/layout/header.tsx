@@ -12,17 +12,19 @@ interface HeaderProps {
 export function Header({ onMenuToggle }: HeaderProps) {
   const { data: systemStatus } = useSystemStatus();
 
-  const statusColor =
-    systemStatus?.status === "healthy"
+  const statusColor = !systemStatus
+    ? "bg-gray-400"
+    : systemStatus.status === "ok"
       ? "bg-green-500"
-      : systemStatus?.status === "degraded"
+      : systemStatus.status === "degraded"
         ? "bg-yellow-500"
         : "bg-red-500";
 
-  const statusLabel =
-    systemStatus?.status === "healthy"
+  const statusLabel = !systemStatus
+    ? "확인 중"
+    : systemStatus.status === "ok"
       ? "정상"
-      : systemStatus?.status === "degraded"
+      : systemStatus.status === "degraded"
         ? "일부 장애"
         : "장애";
 

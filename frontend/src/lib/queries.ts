@@ -15,6 +15,7 @@ import type {
   PaginationParams,
   Document,
   PaginatedResponse,
+  ListResponse,
   Chunk,
   SystemStatus,
   MonitoringStats,
@@ -24,22 +25,21 @@ import type {
   EvaluationComparison,
   Trace,
   CostEntry,
-  WatchedFile,
-  ModelInfo,
+  AvailableModels,
 } from "@/types";
 
 // ========== Documents ==========
 
 export function useDocuments(params?: DocumentListParams) {
   return useQuery<PaginatedResponse<Document>>({
-    queryKey: ["documents", params],
+    queryKey: ["documents", "list", params],
     queryFn: () => api.documents.list(params),
   });
 }
 
 export function useDocument(id: string) {
   return useQuery<Document>({
-    queryKey: ["documents", id],
+    queryKey: ["documents", "detail", id],
     queryFn: () => api.documents.get(id),
     enabled: !!id,
   });
@@ -47,7 +47,7 @@ export function useDocument(id: string) {
 
 export function useDocumentChunks(id: string) {
   return useQuery<Chunk[]>({
-    queryKey: ["documents", id, "chunks"],
+    queryKey: ["documents", "chunks", id],
     queryFn: () => api.documents.chunks(id),
     enabled: !!id,
   });
@@ -113,7 +113,7 @@ export function useUpdateSettings() {
 }
 
 export function useModels() {
-  return useQuery<ModelInfo[]>({
+  return useQuery<AvailableModels>({
     queryKey: ["settings", "models"],
     queryFn: () => api.settings.models(),
   });
@@ -126,13 +126,6 @@ export function useWatcherStatus() {
     queryKey: ["watcher", "status"],
     queryFn: () => api.watcher.status(),
     refetchInterval: 5000,
-  });
-}
-
-export function useWatcherFiles(params?: PaginationParams) {
-  return useQuery<PaginatedResponse<WatchedFile>>({
-    queryKey: ["watcher", "files", params],
-    queryFn: () => api.watcher.files(params),
   });
 }
 
@@ -169,7 +162,7 @@ export function useScanWatcher() {
 // ========== Evaluation ==========
 
 export function useEvaluationDatasets() {
-  return useQuery<PaginatedResponse<EvaluationDataset>>({
+  return useQuery<ListResponse<EvaluationDataset>>({
     queryKey: ["evaluation", "datasets"],
     queryFn: () => api.evaluation.datasets.list(),
   });
@@ -186,7 +179,8 @@ export function useEvaluationDataset(id: string) {
 export function useCreateDataset() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (formData: FormData) => api.evaluation.datasets.create(formData),
+    mutationFn: (data: { name: string; items: Record<string, unknown>[] }) =>
+      api.evaluation.datasets.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["evaluation", "datasets"] });
     },
@@ -194,7 +188,7 @@ export function useCreateDataset() {
 }
 
 export function useEvaluationRuns() {
-  return useQuery<PaginatedResponse<EvaluationRun>>({
+  return useQuery<ListResponse<EvaluationRun>>({
     queryKey: ["evaluation", "runs"],
     queryFn: () => api.evaluation.runs.list(),
   });
@@ -237,22 +231,22 @@ export function useMonitoringStats() {
 }
 
 export function useTraces(params?: PaginationParams) {
-  return useQuery<PaginatedResponse<Trace>>({
-    queryKey: ["monitoring", "traces", params],
+  return useQuery<ListResponse<Trace>>({
+    queryKey: ["monitoring", "traces", "list", params],
     queryFn: () => api.monitoring.traces(params),
   });
 }
 
 export function useTraceDetail(id: string) {
   return useQuery<Trace>({
-    queryKey: ["monitoring", "traces", id],
+    queryKey: ["monitoring", "traces", "detail", id],
     queryFn: () => api.monitoring.traceDetail(id),
     enabled: !!id,
   });
 }
 
 export function useCosts(params?: { start_date?: string; end_date?: string }) {
-  return useQuery<CostEntry[]>({
+  return useQuery<CostEntry>({
     queryKey: ["monitoring", "costs", params],
     queryFn: () => api.monitoring.costs(params),
   });

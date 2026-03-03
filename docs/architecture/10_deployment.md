@@ -15,13 +15,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:${POSTGRES_PASSWORD}@shared-postgres:5432/shared
       ELASTICSEARCH_URL: http://shared-elasticsearch:9200
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       REDIS_URL: redis://rag-redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       LANGFUSE_HOST: http://rag-langfuse:3000
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - upload_data:/app/uploads
     depends_on:
@@ -40,8 +38,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:${POSTGRES_PASSWORD}@shared-postgres:5432/shared
       ELASTICSEARCH_URL: http://shared-elasticsearch:9200
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       REDIS_URL: redis://rag-redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       - rag-redis
     networks:
@@ -58,8 +56,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:${POSTGRES_PASSWORD}@shared-postgres:5432/shared
       ELASTICSEARCH_URL: http://shared-elasticsearch:9200
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       REDIS_URL: redis://rag-redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - upload_data:/app/uploads
       - ${WATCH_DIR_1:-./watched}:/data/documents:ro
@@ -80,6 +78,8 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
     restart: unless-stopped
+    # 개발 모드에서는 포트 3500 사용 (pnpm dev --port 3500)
+    # 프로덕션 빌드는 포트 3000
 
   rag-redis:
     image: redis:7-alpine
@@ -88,7 +88,7 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
-  langfuse:
+  langfuse-web:
     image: langfuse/langfuse:3
     container_name: rag-langfuse
     ports:
@@ -100,8 +100,43 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       SALT: ${SALT}
       NEXTAUTH_URL: http://localhost:3100
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://rag-langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minioadmin
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: minioadmin
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      REDIS_HOST: rag-langfuse-redis
+      REDIS_PORT: "6379"
     depends_on:
       - rag-clickhouse
+      - rag-langfuse-redis
+      - rag-langfuse-minio
+    networks:
+      - default
+      - shared-infra
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse:3
+    container_name: rag-langfuse-worker
+    command: ["node", "packages/worker/dist/index.js"]
+    environment:
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD}@shared-postgres:5432/shared
+      CLICKHOUSE_MIGRATION_URL: clickhouse://rag-clickhouse:9000
+      CLICKHOUSE_URL: http://rag-clickhouse:8123
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://rag-langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minioadmin
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: minioadmin
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      REDIS_HOST: rag-langfuse-redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - rag-clickhouse
+      - rag-langfuse-redis
+      - rag-langfuse-minio
     networks:
       - default
       - shared-infra
@@ -110,14 +145,40 @@ services:
   rag-clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: rag-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+    restart: unless-stopped
+
+  rag-langfuse-redis:
+    image: redis:7-alpine
+    container_name: rag-langfuse-redis
+    volumes:
+      - langfuse_redis_data:/data
+    restart: unless-stopped
+
+  rag-langfuse-minio:
+    image: minio/minio
+    container_name: rag-langfuse-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - langfuse_minio_data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     restart: unless-stopped
 
 volumes:
   redis_data:
   clickhouse_data:
   upload_data:
+  langfuse_redis_data:
+  langfuse_minio_data:
 
 networks:
   shared-infra:
@@ -131,24 +192,20 @@ networks:
 # === 인프라 연결 ===
 POSTGRES_PASSWORD=changeme_strong_password
 
-# === Ollama ===
-# Mac Studio: http://host.docker.internal:11434 (Docker에서) 또는 http://localhost:11434 (로컬)
-# Linux GPU: http://localhost:11434
-OLLAMA_URL=http://host.docker.internal:11434
-
-# === 외부 API (저사양 또는 평가용) ===
+# === OpenAI API (필수) ===
+# 임베딩(text-embedding-3-small), LLM(gpt-4.1-mini), 평가(gpt-4o) 모두 사용
 OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
 
 # === 디렉토리 감시 ===
 # Docker 볼륨 마운트할 감시 디렉토리 (호스트 경로)
 WATCH_DIR_1=./watched
 
-# === Langfuse ===
+# === Langfuse v3 ===
 LANGFUSE_PUBLIC_KEY=pk-...
 LANGFUSE_SECRET_KEY=sk-...
 NEXTAUTH_SECRET=changeme
 SALT=changeme
+ENCRYPTION_KEY=  # 64자 hex (openssl rand -hex 32 으로 생성)
 ```
 
 ## 백엔드 Dockerfile
@@ -199,15 +256,12 @@ curl -X PUT "http://localhost:9200/_index_template/rag_template" \
   -d @infra/elasticsearch/nori-index-template.json
 ```
 
-### 3. Ollama 모델 확인 (Mac Studio)
+### 3. OpenAI API 키 확인
 
 ```bash
-# Ollama가 실행 중인지 확인
-curl http://localhost:11434/api/tags
-
-# 필요한 모델 다운로드
-ollama pull bge-m3
-ollama pull qwen2.5:7b
+# API 키가 유효한지 확인
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY" | head -c 200
 ```
 
 ### 4. 앱 기동
@@ -266,7 +320,7 @@ dev-backend:
 	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend:
-	cd frontend && pnpm dev
+	cd frontend && pnpm dev --port 3500
 
 # 로그
 logs:
@@ -293,19 +347,18 @@ eval:
 reindex-all:
 	curl -X POST http://localhost:8000/api/system/reindex-all
 
-# Ollama 모델 다운로드
-ollama-setup:
-	ollama pull bge-m3
-	ollama pull qwen2.5:7b
+# Langfuse v3 ENCRYPTION_KEY 생성
+langfuse-key:
+	openssl rand -hex 32
 ```
 
 ## Mac Studio 환경 주의사항
 
-1. **Ollama는 호스트에서 직접 실행**: Docker 내 Ollama는 Metal GPU를 사용할 수 없어 5-6배 느림
-2. **Docker에서 Ollama 접근**: `OLLAMA_URL=http://host.docker.internal:11434` 사용
-3. **로컬 개발 시 Ollama 접근**: `OLLAMA_URL=http://localhost:11434` 사용
-4. **Docker Named Volume 사용**: 바인드 마운트는 Linux 대비 3배 느림
-5. **슬립 방지**: 서버로 사용 시 `caffeinate -s` 실행
+1. **OpenAI API 전용**: 임베딩, LLM, 평가 모두 OpenAI API 사용 (Ollama 미사용)
+2. **리랭커 로컬 실행**: bge-reranker-v2-m3-ko는 MPS(Metal Performance Shaders) 가속으로 로컬 실행
+3. **Docker Named Volume 사용**: 바인드 마운트는 Linux 대비 3배 느림
+4. **슬립 방지**: 서버로 사용 시 `caffeinate -s` 실행
+5. **프론트엔드 포트**: 개발 모드 3500, 프로덕션 3000
 
 ## 리랭커 실행 환경
 

@@ -22,16 +22,12 @@ export default function MetricsPage() {
   const { data: stats } = useMonitoringStats();
   const { data: costs } = useCosts();
 
-  // Aggregate cost data by date
-  const costByDate = (costs ?? []).reduce<Record<string, { date: string; cost: number; tokens: number }>>((acc, c) => {
-    if (!acc[c.date]) {
-      acc[c.date] = { date: c.date, cost: 0, tokens: 0 };
-    }
-    acc[c.date].cost += c.cost_usd;
-    acc[c.date].tokens += c.tokens_in + c.tokens_out;
-    return acc;
-  }, {});
-  const costChartData = Object.values(costByDate).sort((a, b) => a.date.localeCompare(b.date));
+  // Aggregate cost data from breakdown
+  const costChartData = (costs?.breakdown ?? []).map((entry) => ({
+    date: String(entry.date ?? ""),
+    cost: Number(entry.cost ?? 0),
+    tokens: Number(entry.tokens ?? 0),
+  }));
 
   return (
     <div className="space-y-6">

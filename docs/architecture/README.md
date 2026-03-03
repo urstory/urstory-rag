@@ -21,5 +21,5 @@
 
 1. **모든 기능 즉시 구현**: 리랭킹, HyDE, 가드레일, RAGAS 평가를 모두 포함. 관리자 UI에서 ON/OFF 제어
 2. **인프라 분리**: PostgreSQL + Elasticsearch는 독립 docker-compose로 운영하여 다른 프로젝트와 공유
-3. **LLM 프로바이더 추상화**: Mac Studio의 Ollama(기본) 또는 외부 API(OpenAI/Claude) 전환 가능
-4. **한국어 최적화**: Nori 형태소 분석, bge-m3 임베딩, bge-reranker-v2-m3-ko 리랭킹
+3. **OpenAI API 전용**: 임베딩(text-embedding-3-small), LLM(gpt-4.1-mini), 평가(gpt-4o) 모두 OpenAI API 사용
+4. **한국어 최적화**: Nori 형태소 분석, 한국어 리랭커(bge-reranker-v2-m3-ko), 멀티쿼리 구조분해

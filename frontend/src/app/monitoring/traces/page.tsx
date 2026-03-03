@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useTraces, useTraceDetail } from "@/lib/queries";
 import type { PaginationParams } from "@/types";
 
@@ -173,34 +173,11 @@ export default function TracesPage() {
         </Table>
       </div>
 
-      {/* Pagination */}
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            총 {data.total}개
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={(params.page ?? 1) <= 1}
-              onClick={() => setParams({ ...params, page: (params.page ?? 1) - 1 })}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              {data.page} / {data.pages}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={data.page >= data.pages}
-              onClick={() => setParams({ ...params, page: (params.page ?? 1) + 1 })}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {/* Total count */}
+      {data && data.total > 0 && (
+        <p className="text-sm text-muted-foreground">
+          총 {data.total}개
+        </p>
       )}
 
       {selectedTraceId && (

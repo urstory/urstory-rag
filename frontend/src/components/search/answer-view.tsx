@@ -3,14 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import type { SearchResultDocument } from "@/types";
+import type { SearchResult } from "@/types";
 
 interface AnswerViewProps {
   answer: string;
-  documents: SearchResultDocument[];
+  results: SearchResult[];
 }
 
-export function AnswerView({ answer, documents }: AnswerViewProps) {
+export function AnswerView({ answer, results }: AnswerViewProps) {
   return (
     <div data-testid="answer-view" className="space-y-4">
       {/* Answer */}
@@ -30,24 +30,24 @@ export function AnswerView({ answer, documents }: AnswerViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             참조 문서
-            <Badge variant="secondary">{documents.length}건</Badge>
+            <Badge variant="secondary">{results.length}건</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {documents.map((doc, index) => (
-            <div key={doc.id}>
+          {results.map((doc, index) => (
+            <div key={doc.chunk_id}>
               {index > 0 && <Separator className="mb-3" />}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">
-                    {index + 1}. {doc.meta.doc_name}
+                    {index + 1}. {(doc.metadata?.filename as string) ?? "알 수 없는 문서"}
                   </span>
                   <Badge variant="outline">
-                    점수: {doc.score.toFixed(4)}
+                    점수: {doc.score?.toFixed(4) ?? "-"}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  청크 #{doc.meta.chunk_index + 1}
+                  청크 ID: {doc.chunk_id}
                 </p>
                 <p className="rounded-md bg-muted p-3 text-sm leading-relaxed">
                   {doc.content}
@@ -55,7 +55,7 @@ export function AnswerView({ answer, documents }: AnswerViewProps) {
               </div>
             </div>
           ))}
-          {documents.length === 0 && (
+          {results.length === 0 && (
             <p className="text-sm text-muted-foreground">참조 문서가 없습니다.</p>
           )}
         </CardContent>

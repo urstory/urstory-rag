@@ -25,11 +25,11 @@ export default function DashboardPage() {
     .filter((r) => r.status === "completed" && r.metrics)
     .slice(0, 5)
     .map((r) => ({
-      name: new Date(r.created_at).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
-      faithfulness: +(r.metrics.faithfulness * 100).toFixed(1),
-      relevancy: +(r.metrics.answer_relevancy * 100).toFixed(1),
-      precision: +(r.metrics.context_precision * 100).toFixed(1),
-      recall: +(r.metrics.context_recall * 100).toFixed(1),
+      name: r.created_at ? new Date(r.created_at).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }) : "-",
+      faithfulness: +((r.metrics?.faithfulness ?? 0) * 100).toFixed(1),
+      relevancy: +((r.metrics?.answer_relevancy ?? 0) * 100).toFixed(1),
+      precision: +((r.metrics?.context_precision ?? 0) * 100).toFixed(1),
+      recall: +((r.metrics?.context_recall ?? 0) * 100).toFixed(1),
     }));
 
   return (
@@ -97,30 +97,30 @@ export default function DashboardPage() {
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">임베딩</span>
-                  <span className="font-medium">{settings.embedding.model} ({settings.embedding.provider})</span>
+                  <span className="font-medium">{settings.embedding_model} ({settings.embedding_provider})</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">검색 모드</span>
-                  <Badge variant="secondary">{settings.search.mode}</Badge>
+                  <Badge variant="secondary">{settings.search_mode}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">리랭킹</span>
-                  <Badge variant={settings.reranking.enabled ? "default" : "outline"}>
-                    {settings.reranking.enabled ? "ON" : "OFF"}
+                  <Badge variant={settings.reranking_enabled ? "default" : "outline"}>
+                    {settings.reranking_enabled ? "ON" : "OFF"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">HyDE</span>
-                  <Badge variant={settings.hyde.enabled ? "default" : "outline"}>
-                    {settings.hyde.enabled ? "ON" : "OFF"}
+                  <Badge variant={settings.hyde_enabled ? "default" : "outline"}>
+                    {settings.hyde_enabled ? "ON" : "OFF"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">가드레일</span>
                   <div className="flex gap-1">
-                    <Badge variant={settings.guardrails.pii_detection ? "default" : "outline"}>PII</Badge>
-                    <Badge variant={settings.guardrails.injection_detection ? "default" : "outline"}>인젝션</Badge>
-                    <Badge variant={settings.guardrails.hallucination_detection ? "default" : "outline"}>할루시네이션</Badge>
+                    <Badge variant={settings.pii_detection_enabled ? "default" : "outline"}>PII</Badge>
+                    <Badge variant={settings.injection_detection_enabled ? "default" : "outline"}>인젝션</Badge>
+                    <Badge variant={settings.hallucination_detection_enabled ? "default" : "outline"}>할루시네이션</Badge>
                   </div>
                 </div>
               </>
@@ -136,17 +136,18 @@ export default function DashboardPage() {
             <CardTitle className="text-base">컴포넌트 연결 상태</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {systemStatus?.components?.map((comp) => (
-              <div key={comp.name} className="flex items-center justify-between">
-                <span className="text-muted-foreground">{comp.name}</span>
-                <Badge
-                  variant={comp.status === "connected" ? "default" : "destructive"}
-                >
-                  {comp.status === "connected" ? "연결됨" : comp.status === "disconnected" ? "미연결" : "오류"}
-                  {comp.latency_ms ? ` (${comp.latency_ms}ms)` : ""}
-                </Badge>
-              </div>
-            )) ?? (
+            {systemStatus?.components ? (
+              Object.entries(systemStatus.components).map(([name, connected]) => (
+                <div key={name} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{name}</span>
+                  <Badge
+                    variant={connected ? "default" : "destructive"}
+                  >
+                    {connected ? "연결됨" : "미연결"}
+                  </Badge>
+                </div>
+              ))
+            ) : (
               <p className="text-muted-foreground">상태 정보를 불러올 수 없습니다.</p>
             )}
           </CardContent>

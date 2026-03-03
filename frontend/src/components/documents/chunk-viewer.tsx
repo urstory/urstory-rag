@@ -33,7 +33,7 @@ export function ChunkViewer({ chunks, isLoading }: ChunkViewerProps) {
                 <CardTitle className="flex items-center justify-between text-xs">
                   <span>청크 #{chunk.chunk_index + 1}</span>
                   <Badge variant="outline" className="text-xs">
-                    {chunk.embedding_status}
+                    ID: {chunk.id.slice(0, 8)}
                   </Badge>
                 </CardTitle>
               </CardHeader>

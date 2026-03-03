@@ -42,8 +42,10 @@ out/
 .claude/
 CLAUDE.md
 
-# 로그
+# 로그 및 PID
 *.log
+logs/
+*.pid
 
 # 업로드 파일 (런타임)
 uploads/
@@ -51,5 +53,6 @@ uploads/
 # 개발 doc (docs/architecture/ 만 공개, 나머지는 무시)
 docs/*
 !docs/architecture/
+!docs/images/
 
 test_files/

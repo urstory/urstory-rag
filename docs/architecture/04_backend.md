@@ -35,7 +35,6 @@ dependencies = [
     "haystack-ai>=2.9",
     "haystack-integrations[pgvector]",
     "haystack-integrations[elasticsearch]",
-    "haystack-integrations[ollama]",
 
     # DB
     "sqlalchemy[asyncio]>=2.0",
@@ -84,7 +83,9 @@ dependencies = [
 │  (chunking, embedding, search,       │
 │   reranking, hyde, generation,       │
 │   guardrails, evaluation, document,  │
-│   watcher)                           │
+│   watcher, multi_query, classifier,  │
+│   query_expander, cascading_eval,    │
+│   evidence_extractor, numeric_verify)│
 └──────────────┬───────────────────────┘
                │
 ┌──────────────▼───────────────────────┐
@@ -95,8 +96,9 @@ dependencies = [
                │
 ┌──────────────▼───────────────────────┐
 │       Infrastructure Layer           │
-│  PGVector, Elasticsearch, Ollama,    │
-│  Redis, Langfuse, OpenAI/Claude API  │
+│  PGVector, Elasticsearch, Redis,     │
+│  Langfuse, OpenAI API (primary),     │
+│  Claude API (alternative)            │
 └──────────────────────────────────────┘
 ```
 
@@ -113,13 +115,9 @@ class EmbeddingProvider(Protocol):
     async def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
     async def embed_query(self, text: str) -> list[float]: ...
 
-class OllamaEmbedding:
-    """Ollama bge-m3 임베딩"""
-    def __init__(self, model: str = "bge-m3", url: str = "http://localhost:11434"): ...
-
 class OpenAIEmbedding:
-    """OpenAI text-embedding-3-large"""
-    def __init__(self, model: str = "text-embedding-3-large"): ...
+    """OpenAI text-embedding-3-small (기본 제공자)"""
+    def __init__(self, model: str = "text-embedding-3-small"): ...
 ```
 
 ### KeywordSearchEngine
@@ -144,7 +142,13 @@ class Reranker(Protocol):
     async def rerank(self, query: str, documents: list[Document], top_k: int = 5) -> list[Document]: ...
 
 class KoreanCrossEncoder:
-    """dragonkue/bge-reranker-v2-m3-ko"""
+    """dragonkue/bge-reranker-v2-m3-ko
+
+    sigmoid 캘리브레이션 지원 (reranker_score_mode: "calibrated"):
+    - raw 점수를 sigmoid로 변환하여 0~1 확률로 정규화
+    - 순위 신호(rank-based score)와 결합하여 최종 점수 산출
+    - reranker_alpha 파라미터로 sigmoid/rank 비중 조절
+    """
 ```
 
 ### LLMProvider
@@ -153,14 +157,125 @@ class KoreanCrossEncoder:
 class LLMProvider(Protocol):
     async def generate(self, prompt: str, system_prompt: str | None = None) -> str: ...
 
-class OllamaLLM:
-    """Ollama 로컬 LLM (Qwen2.5-7B 등)"""
-
 class OpenAILLM:
-    """OpenAI GPT-4 등"""
+    """OpenAI API (기본 제공자) — gpt-4.1-mini (답변 생성, HyDE), gpt-4o (평가 Judge)"""
 
 class ClaudeLLM:
-    """Anthropic Claude"""
+    """Anthropic Claude (대안 제공자)"""
+
+class OllamaLLM:
+    """Ollama 로컬 LLM (대안 제공자)"""
+```
+
+## Phase 10-11 서비스 (검색 품질 튜닝)
+
+### 검색 서비스 확장
+
+```python
+class MultiQueryGenerator:
+    """services/search/multi_query.py
+    원본 질문을 다양한 관점의 하위 쿼리로 분해하여 검색 커버리지 확대"""
+
+class QuestionClassifier:
+    """services/search/question_classifier.py
+    질문 유형(사실형/비교형/절차형 등) 분류 → 검색 전략 분기"""
+
+class QueryExpander:
+    """services/search/query_expander.py
+    동의어·관련어 확장으로 키워드 검색 재현율 향상"""
+
+class CascadingQualityEvaluator:
+    """services/search/cascading_evaluator.py
+    vector → hybrid → multi_query 순으로 품질 평가하며 단계적 검색 전환"""
+
+class DocumentScopeSelector:
+    """services/search/document_scope.py
+    질문에 언급된 문서/카테고리를 식별하여 검색 범위 한정"""
+```
+
+### 생성·검증 서비스 확장
+
+```python
+class EvidenceExtractor:
+    """services/generation/evidence_extractor.py
+    검색된 청크에서 정확한 인용 근거(문장 단위)를 추출"""
+
+class FaithfulnessChecker:
+    """services/guardrails/faithfulness.py
+    생성된 답변이 검색 근거에 충실한지 검증 (할루시네이션 방지)"""
+
+class RetrievalQualityGate:
+    """services/guardrails/retrieval_gate.py
+    검색 결과 품질이 임계치 미달 시 답변 거부 또는 재검색"""
+
+class NumericVerifier:
+    """services/guardrails/numeric_verifier.py
+    답변 내 숫자 데이터가 원문과 일치하는지 교차 검증"""
+```
+
+### 청킹 서비스 확장
+
+```python
+class ContextualChunking:
+    """services/chunking/contextual.py
+    기존 청킹에 문서 전체 맥락(요약)을 각 청크 앞에 추가하는 데코레이터 패턴"""
+
+class AutoDetectChunking:
+    """services/chunking/auto_detect.py
+    문서 형식(PDF/MD/TXT 등)을 자동 감지하여 최적 청킹 전략 선택"""
+```
+
+## 서비스 디렉토리 구조
+
+```
+backend/app/
+├── api/
+│   ├── documents.py
+│   ├── search.py
+│   ├── settings.py
+│   ├── evaluation.py
+│   ├── monitoring.py
+│   ├── watcher.py
+│   └── system.py
+├── services/
+│   ├── chunking/
+│   │   ├── base.py
+│   │   ├── contextual.py          # ContextualChunking
+│   │   └── auto_detect.py         # AutoDetectChunking
+│   ├── embedding/
+│   │   └── openai.py              # OpenAIEmbedding (기본)
+│   ├── search/
+│   │   ├── hybrid.py
+│   │   ├── multi_query.py         # MultiQueryGenerator
+│   │   ├── question_classifier.py # QuestionClassifier
+│   │   ├── query_expander.py      # QueryExpander
+│   │   ├── cascading_evaluator.py # CascadingQualityEvaluator
+│   │   └── document_scope.py      # DocumentScopeSelector
+│   ├── reranking/
+│   │   └── korean_cross_encoder.py
+│   ├── hyde/
+│   │   └── generator.py
+│   ├── generation/
+│   │   ├── answer.py
+│   │   └── evidence_extractor.py  # EvidenceExtractor
+│   ├── guardrails/
+│   │   ├── input_guard.py
+│   │   ├── faithfulness.py        # FaithfulnessChecker
+│   │   ├── retrieval_gate.py      # RetrievalQualityGate
+│   │   └── numeric_verifier.py    # NumericVerifier
+│   ├── evaluation/
+│   │   └── ragas.py
+│   ├── document/
+│   │   └── indexer.py
+│   ├── watcher/
+│   │   └── directory.py
+│   └── llm/
+│       ├── openai.py              # OpenAILLM (기본)
+│       ├── claude.py              # ClaudeLLM (대안)
+│       └── ollama.py              # OllamaLLM (대안)
+├── models/
+├── core/
+└── pipelines/
 ```
 
 ## 비동기 작업 처리

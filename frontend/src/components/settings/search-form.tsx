@@ -40,32 +40,47 @@ const searchSchema = z.object({
 type SearchFormData = z.infer<typeof searchSchema>;
 
 export function SearchForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
-    values: settings?.search ?? {
-      mode: "hybrid",
-      keyword_engine: "elasticsearch",
-      rrf_constant: 60,
-      vector_weight: 0.5,
-      keyword_weight: 0.5,
-      cascading_bm25_threshold: 3.0,
-      cascading_min_qualifying_docs: 3,
-      cascading_min_doc_score: 1.0,
-      cascading_fallback_vector_weight: 0.3,
-      cascading_fallback_keyword_weight: 0.7,
-      query_expansion_enabled: true,
-      query_expansion_max_keywords: 10,
-      multi_query_enabled: true,
-      multi_query_count: 4,
+    values: {
+      mode: (settings?.search_mode as SearchFormData["mode"]) ?? "hybrid",
+      keyword_engine: settings?.keyword_engine ?? "elasticsearch",
+      rrf_constant: settings?.rrf_constant ?? 60,
+      vector_weight: settings?.vector_weight ?? 0.5,
+      keyword_weight: settings?.keyword_weight ?? 0.5,
+      cascading_bm25_threshold: settings?.cascading_bm25_threshold ?? 3.0,
+      cascading_min_qualifying_docs: settings?.cascading_min_qualifying_docs ?? 3,
+      cascading_min_doc_score: settings?.cascading_min_doc_score ?? 1.0,
+      cascading_fallback_vector_weight: settings?.cascading_fallback_vector_weight ?? 0.3,
+      cascading_fallback_keyword_weight: settings?.cascading_fallback_keyword_weight ?? 0.7,
+      query_expansion_enabled: settings?.query_expansion_enabled ?? true,
+      query_expansion_max_keywords: settings?.query_expansion_max_keywords ?? 10,
+      multi_query_enabled: settings?.multi_query_enabled ?? true,
+      multi_query_count: settings?.multi_query_count ?? 4,
     },
   });
 
   const onSubmit = async (data: SearchFormData) => {
     try {
-      await updateMutation.mutateAsync({ search: data });
+      await updateMutation.mutateAsync({
+        search_mode: data.mode,
+        keyword_engine: data.keyword_engine,
+        rrf_constant: data.rrf_constant,
+        vector_weight: data.vector_weight,
+        keyword_weight: data.keyword_weight,
+        cascading_bm25_threshold: data.cascading_bm25_threshold,
+        cascading_min_qualifying_docs: data.cascading_min_qualifying_docs,
+        cascading_min_doc_score: data.cascading_min_doc_score,
+        cascading_fallback_vector_weight: data.cascading_fallback_vector_weight,
+        cascading_fallback_keyword_weight: data.cascading_fallback_keyword_weight,
+        query_expansion_enabled: data.query_expansion_enabled,
+        query_expansion_max_keywords: data.query_expansion_max_keywords,
+        multi_query_enabled: data.multi_query_enabled,
+        multi_query_count: data.multi_query_count,
+      });
       toast.success("검색 설정이 저장되었습니다.");
     } catch {
       toast.error("설정 저장에 실패했습니다.");
@@ -73,6 +88,7 @@ export function SearchForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   const mode = form.watch("mode");
   const vectorWeight = form.watch("vector_weight");

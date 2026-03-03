@@ -54,42 +54,46 @@ function RunDetailDialog({
         </DialogHeader>
         {run ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Faithfulness</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-bold">{(run.metrics.faithfulness * 100).toFixed(1)}%</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Relevancy</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-bold">{(run.metrics.answer_relevancy * 100).toFixed(1)}%</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Precision</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-bold">{(run.metrics.context_precision * 100).toFixed(1)}%</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Recall</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-bold">{(run.metrics.context_recall * 100).toFixed(1)}%</p>
-                </CardContent>
-              </Card>
-            </div>
+            {run.metrics ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Faithfulness</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold">{((run.metrics.faithfulness ?? 0) * 100).toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Relevancy</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold">{((run.metrics.answer_relevancy ?? 0) * 100).toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Precision</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold">{((run.metrics.context_precision ?? 0) * 100).toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Recall</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold">{((run.metrics.context_recall ?? 0) * 100).toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">메트릭 정보가 없습니다.</p>
+            )}
 
-            {run.per_question_results?.length > 0 && (
+            {run.per_question_results && run.per_question_results.length > 0 && (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -105,10 +109,10 @@ function RunDetailDialog({
                     {run.per_question_results.map((r, i) => (
                       <TableRow key={i}>
                         <TableCell className="max-w-[300px] truncate">{r.question}</TableCell>
-                        <TableCell className="text-right">{(r.faithfulness * 100).toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{(r.answer_relevancy * 100).toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{(r.context_precision * 100).toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{(r.context_recall * 100).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">{((r.faithfulness ?? 0) * 100).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">{((r.answer_relevancy ?? 0) * 100).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">{((r.context_precision ?? 0) * 100).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">{((r.context_recall ?? 0) * 100).toFixed(1)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -176,7 +180,7 @@ export default function RunsPage() {
             <SelectContent>
               {datasetsData?.items?.map((ds) => (
                 <SelectItem key={ds.id} value={ds.id}>
-                  {ds.name} ({ds.qa_count} QA)
+                  {ds.name} ({ds.items?.length ?? 0} QA)
                 </SelectItem>
               ))}
             </SelectContent>
@@ -220,21 +224,21 @@ export default function RunsPage() {
               runsData.items.map((run) => (
                 <TableRow key={run.id}>
                   <TableCell>
-                    {new Date(run.created_at).toLocaleDateString("ko-KR")}
+                    {run.created_at ? new Date(run.created_at).toLocaleDateString("ko-KR") : "-"}
                   </TableCell>
                   <TableCell>{run.dataset_name || run.dataset_id}</TableCell>
                   <TableCell>{statusBadge(run.status)}</TableCell>
                   <TableCell className="text-right">
-                    {run.metrics ? (run.metrics.faithfulness * 100).toFixed(1) : "-"}
+                    {run.metrics ? ((run.metrics.faithfulness ?? 0) * 100).toFixed(1) : "-"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {run.metrics ? (run.metrics.answer_relevancy * 100).toFixed(1) : "-"}
+                    {run.metrics ? ((run.metrics.answer_relevancy ?? 0) * 100).toFixed(1) : "-"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {run.metrics ? (run.metrics.context_precision * 100).toFixed(1) : "-"}
+                    {run.metrics ? ((run.metrics.context_precision ?? 0) * 100).toFixed(1) : "-"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {run.metrics ? (run.metrics.context_recall * 100).toFixed(1) : "-"}
+                    {run.metrics ? ((run.metrics.context_recall ?? 0) * 100).toFixed(1) : "-"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

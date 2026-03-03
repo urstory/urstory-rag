@@ -53,7 +53,7 @@ export default function ComparePage() {
             <SelectContent>
               {completedRuns.map((run) => (
                 <SelectItem key={run.id} value={run.id}>
-                  {new Date(run.created_at).toLocaleDateString("ko-KR")} - {run.dataset_name || run.dataset_id}
+                  {run.created_at ? new Date(run.created_at).toLocaleDateString("ko-KR") : "-"} - {run.dataset_name || run.dataset_id}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -68,7 +68,7 @@ export default function ComparePage() {
             <SelectContent>
               {completedRuns.map((run) => (
                 <SelectItem key={run.id} value={run.id}>
-                  {new Date(run.created_at).toLocaleDateString("ko-KR")} - {run.dataset_name || run.dataset_id}
+                  {run.created_at ? new Date(run.created_at).toLocaleDateString("ko-KR") : "-"} - {run.dataset_name || run.dataset_id}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -87,9 +87,9 @@ export default function ComparePage() {
           </div>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {(Object.keys(metricLabels) as Array<keyof typeof metricLabels>).map((metric) => {
-              const val1 = comparison.run1.metrics[metric as keyof typeof comparison.run1.metrics];
-              const val2 = comparison.run2.metrics[metric as keyof typeof comparison.run2.metrics];
-              const diff = comparison.metric_diffs[metric as keyof typeof comparison.metric_diffs];
+              const val1 = comparison.run1.metrics?.[metric as keyof typeof comparison.run1.metrics] ?? 0;
+              const val2 = comparison.run2.metrics?.[metric as keyof typeof comparison.run2.metrics] ?? 0;
+              const diff = comparison.diff[metric] ?? 0;
               const isPositive = diff > 0;
 
               return (

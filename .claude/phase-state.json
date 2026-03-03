@@ -1,9 +1,0 @@
-{
-  "currentPhase": 11,
-  "featureName": "멀티쿼리 검색 + 정확 인용 모드 + Contextual Chunking 강화",
-  "branchName": "feature/phase-11",
-  "currentStep": 1,
-  "status": "in_progress",
-  "completedSteps": [],
-  "startedAt": "2026-03-03T00:00:00+09:00"
-}

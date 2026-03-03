@@ -88,7 +88,7 @@ export default function DocumentDetailPage({
             </div>
             <div>
               <p className="text-muted-foreground">청크 수</p>
-              <p className="font-medium">{doc.chunk_count}</p>
+              <p className="font-medium">{doc.chunk_count ?? 0}</p>
             </div>
             <div>
               <p className="text-muted-foreground">소스</p>

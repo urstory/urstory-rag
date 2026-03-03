@@ -348,7 +348,7 @@ make test            # 백엔드 테스트 실행
 
 ## 만든 사람
 
-**김성박** (Sungbak Kim)
+**김성박** (Sungpark Kim)
 
 - Email: urstory@fullstackfamily.com
 - GitHub: [@urstory](https://github.com/urstory)

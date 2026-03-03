@@ -26,20 +26,23 @@ const embeddingSchema = z.object({
 type EmbeddingFormData = z.infer<typeof embeddingSchema>;
 
 export function EmbeddingForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<EmbeddingFormData>({
     resolver: zodResolver(embeddingSchema),
-    values: settings?.embedding ?? {
-      provider: "ollama",
-      model: "bge-m3",
+    values: {
+      provider: settings?.embedding_provider ?? "openai",
+      model: settings?.embedding_model ?? "text-embedding-3-small",
     },
   });
 
   const onSubmit = async (data: EmbeddingFormData) => {
     try {
-      await updateMutation.mutateAsync({ embedding: data });
+      await updateMutation.mutateAsync({
+        embedding_provider: data.provider,
+        embedding_model: data.model,
+      });
       toast.success("임베딩 설정이 저장되었습니다.");
     } catch {
       toast.error("설정 저장에 실패했습니다.");
@@ -47,6 +50,7 @@ export function EmbeddingForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   return (
     <Card>

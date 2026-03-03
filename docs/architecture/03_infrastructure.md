@@ -161,9 +161,23 @@ docker compose down -v
 
 ## 네트워크
 
-`shared-infra` 네트워크를 사용합니다. 이 네트워크는 docker-compose에서 자동 생성되며, 앱 계층의 docker-compose에서도 동일한 네트워크에 접속합니다.
+`shared-infra` 외부 네트워크를 사용합니다. 이 네트워크는 infra/ docker-compose에서 자동 생성되며, 앱 계층의 docker-compose에서도 동일한 네트워크에 접속합니다.
 
 Mac (Docker Desktop) 환경에서는 `host.docker.internal`로도 접근 가능하지만, 네트워크 공유 방식이 환경 독립적이므로 `shared-infra` 네트워크 방식을 기본으로 사용합니다.
+
+## 앱 계층 Langfuse v3 인프라
+
+앱 계층 docker-compose (프로젝트 루트 `docker-compose.yml`)에는 Langfuse v3 관련 컴포넌트가 포함됩니다. 이들은 공유 인프라가 아닌 앱 전용 인프라입니다.
+
+| 컴포넌트 | 컨테이너 | 포트 | 설명 |
+|----------|---------|------|------|
+| langfuse-web | rag-langfuse | :3100 (외부) → :3000 (내부) | Langfuse 웹 UI |
+| langfuse-worker | rag-langfuse-worker | - | 비동기 이벤트 처리 워커 |
+| ClickHouse | rag-clickhouse | :8123 (HTTP), :9000 (Native) | 트레이스/이벤트 저장 |
+| langfuse-redis | rag-langfuse-redis | :6379 | Langfuse 전용 Redis (앱 Redis와 분리) |
+| langfuse-minio | rag-langfuse-minio | :9000 (API), :9001 (Console) | S3 호환 오브젝트 스토리지 |
+
+> **참고**: Langfuse v3는 `ENCRYPTION_KEY` (64자 hex) 환경변수가 필수입니다. infra/ docker-compose가 생성하는 `shared-infra` 외부 네트워크를 통해 PostgreSQL에 접속합니다.
 
 ## 다른 프로젝트에서 사용
 

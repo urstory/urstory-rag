@@ -27,21 +27,25 @@ const chunkingSchema = z.object({
 type ChunkingFormData = z.infer<typeof chunkingSchema>;
 
 export function ChunkingForm() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings, isLoading, isError } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<ChunkingFormData>({
     resolver: zodResolver(chunkingSchema),
-    values: settings?.chunking ?? {
-      strategy: "recursive",
-      chunk_size: 512,
-      chunk_overlap: 50,
+    values: {
+      strategy: settings?.chunking_strategy ?? "recursive",
+      chunk_size: settings?.chunk_size ?? 512,
+      chunk_overlap: settings?.chunk_overlap ?? 50,
     },
   });
 
   const onSubmit = async (data: ChunkingFormData) => {
     try {
-      await updateMutation.mutateAsync({ chunking: data });
+      await updateMutation.mutateAsync({
+        chunking_strategy: data.strategy,
+        chunk_size: data.chunk_size,
+        chunk_overlap: data.chunk_overlap,
+      });
       toast.success("청킹 설정이 저장되었습니다.");
     } catch {
       toast.error("설정 저장에 실패했습니다.");
@@ -49,6 +53,7 @@ export function ChunkingForm() {
   };
 
   if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
+  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
 
   const chunkSize = form.watch("chunk_size");
   const chunkOverlap = form.watch("chunk_overlap");

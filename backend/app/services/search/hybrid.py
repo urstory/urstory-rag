@@ -211,6 +211,11 @@ class HybridSearchOrchestrator:
 
         # ── 4. 리랭킹 (선택적) — 전체 합집합에 대해 1회 ──
         if settings.reranking_enabled:
+            # 리랭커 입력 후보 수 제한 (Cross-Encoder 메모리 보호)
+            max_rerank_candidates = settings.reranker_top_k * 4
+            if len(documents) > max_rerank_candidates:
+                documents = documents[:max_rerank_candidates]
+
             lf_span = self._lf_span(lf_trace, "reranking")
             t0 = time.perf_counter()
             documents = await self.reranker.rerank(

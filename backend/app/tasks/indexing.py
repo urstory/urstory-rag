@@ -80,12 +80,17 @@ async def create_processor():
     return processor
 
 
+async def _run_indexing(doc_id: str):
+    """단일 이벤트 루프에서 문서 인덱싱 전체 파이프라인을 실행."""
+    file_path = await get_document_file_path(doc_id)
+    processor = await create_processor()
+    await processor.process(doc_id, file_path)
+
+
 @celery_app.task(bind=True, max_retries=3)
 def index_document_task(self, doc_id: str):
     """문서 인덱싱 비동기 태스크."""
     try:
-        file_path = asyncio.run(get_document_file_path(doc_id))
-        processor = asyncio.run(create_processor())
-        asyncio.run(processor.process(doc_id, file_path))
+        asyncio.run(_run_indexing(doc_id))
     except Exception as exc:
         self.retry(exc=exc, countdown=60)

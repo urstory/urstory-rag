@@ -62,7 +62,9 @@ class KoreanCrossEncoder:
         if not documents:
             return []
 
-        pairs = [(query, doc.content) for doc in documents]
+        # Cross-Encoder 메모리 보호: 입력 텍스트를 512자로 제한
+        max_chars = 512
+        pairs = [(query, doc.content[:max_chars]) for doc in documents]
         raw_scores = self.model.predict(pairs)
 
         if score_mode == "replace":

@@ -55,4 +55,5 @@ docs/*
 !docs/architecture/
 !docs/images/
 
-test_files/
+# 테스트 결과 파일 (런타임 생성)
+test_files/quality_test_results*.json

@@ -141,10 +141,6 @@ async def lifespan(app: FastAPI):
     )
     search_api.set_orchestrator(orchestrator)
 
-    settings_session = _async_session_factory()
-    settings_service = SettingsService(db=settings_session)
-    search_api.set_search_settings_service(settings_service)
-
     # 캐시 서비스 초기화
     from app.services.cache import CacheService
     cache_service = CacheService(
@@ -152,6 +148,10 @@ async def lifespan(app: FastAPI):
         enabled=_rag.cache_enabled,
     )
     search_api.set_cache_service(cache_service)
+
+    settings_session = _async_session_factory()
+    settings_service = SettingsService(db=settings_session, cache=cache_service)
+    search_api.set_search_settings_service(settings_service)
 
     # Startup 완료
     app.state.startup_complete = True

@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 description = "Korean RAG Production System"
 authors = [{name = "김성박", email = "urstory@fullstackfamily.com"}]
 license = {text = "MIT"}
-readme = "../README.md"
+readme = {text = "", content-type = "text/markdown"}
 keywords = ["rag", "korean", "nlp", "haystack", "fastapi", "elasticsearch", "nori"]
 
 dependencies = [

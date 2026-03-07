@@ -16,6 +16,7 @@ dependencies = [
 
     # RAG 프레임워크
     "haystack-ai>=2.9",
+    "elasticsearch-haystack>=5.0",
 
     # DB
     "sqlalchemy[asyncio]>=2.0",

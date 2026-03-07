@@ -49,6 +49,16 @@ class CostResponse(BaseModel):
 @router.get("/monitoring/stats", response_model=MonitoringStatsResponse)
 async def get_stats(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """집계 통계를 반환한다."""
+    from app.api.search import get_cache_service
+    from app.services.cache import PREFIX_STATS
+
+    # 캐시 조회
+    cache = get_cache_service()
+    if cache:
+        cached = await cache.get(PREFIX_STATS)
+        if cached is not None:
+            return MonitoringStatsResponse(**cached)
+
     # 문서 수
     doc_count_result = await db.execute(
         select(func.count(Document.id)).where(Document.status == DocumentStatus.INDEXED)
@@ -67,12 +77,68 @@ async def get_stats(db: AsyncSession = Depends(get_db), _admin: User = Depends(r
     # Langfuse 미연동 시 기본값 반환
     today_queries, avg_response = await _get_langfuse_query_stats()
 
-    return MonitoringStatsResponse(
+    result = MonitoringStatsResponse(
         total_documents=total_documents,
         total_chunks=total_chunks,
         today_queries=today_queries,
         avg_response_time_ms=avg_response,
     )
+
+    # 캐시 저장 (5분 TTL)
+    if cache:
+        await cache.set(PREFIX_STATS, result.model_dump(), ttl=300)
+
+    return result
+
+
+# --- Cache Metrics ---
+
+
+class CacheMetricsResponse(BaseModel):
+    enabled: bool
+    hits: int
+    misses: int
+    hit_rate: float
+    total_requests: int
+    cache_key_count: int
+    used_memory_human: str
+
+
+@router.get("/monitoring/cache", response_model=CacheMetricsResponse)
+async def get_cache_metrics(_admin: User = Depends(require_admin)):
+    """캐시 메트릭 조회."""
+    from app.api.search import get_cache_service
+    cache = get_cache_service()
+    if not cache:
+        return CacheMetricsResponse(
+            enabled=False, hits=0, misses=0, hit_rate=0.0,
+            total_requests=0, cache_key_count=0, used_memory_human="N/A",
+        )
+
+    metrics = cache.get_metrics()
+    redis_info = await cache.get_redis_info()
+    return CacheMetricsResponse(
+        enabled=cache.enabled,
+        hits=metrics["hits"],
+        misses=metrics["misses"],
+        hit_rate=metrics["hit_rate"],
+        total_requests=metrics["total_requests"],
+        cache_key_count=redis_info["cache_key_count"],
+        used_memory_human=redis_info["used_memory_human"],
+    )
+
+
+@router.delete("/monitoring/cache")
+async def clear_cache(_admin: User = Depends(require_admin)):
+    """관리자 수동 캐시 비우기."""
+    from app.api.search import get_cache_service
+    cache = get_cache_service()
+    if not cache:
+        return {"cleared": 0}
+
+    count = await cache.invalidate_all()
+    logger.info("cache_cleared_manually", extra={"keys_deleted": count})
+    return {"cleared": count}
 
 
 # --- Traces (Langfuse 프록시) ---

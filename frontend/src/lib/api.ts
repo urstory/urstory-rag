@@ -22,6 +22,8 @@ import type {
   MonitoringStats,
   Trace,
   CostEntry,
+  CacheMetrics,
+  CacheClearResponse,
   SystemStatus,
   HealthCheck,
   AdminUser,
@@ -172,6 +174,51 @@ async function fetchFormData<T>(
   return res.json() as Promise<T>;
 }
 
+async function fetchWithResponse(
+  path: string,
+  options?: {
+    method?: string;
+    body?: unknown;
+    params?: Record<string, unknown>;
+  },
+): Promise<Response> {
+  const url = `${API_BASE}${path}${buildQueryString(options?.params)}`;
+  const headers: Record<string, string> = {};
+
+  const token = _getAccessToken?.();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (options?.body) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const init: RequestInit = {
+    method: options?.method || "GET",
+    headers,
+    credentials: "include",
+  };
+  if (options?.body) {
+    init.body = JSON.stringify(options.body);
+  }
+
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    let errorData: { error?: string; message?: string; detail?: string } = {};
+    try {
+      errorData = await res.json();
+    } catch {
+      // ignore
+    }
+    throw new ApiError(
+      res.status,
+      errorData.error || "UNKNOWN",
+      errorData.message || errorData.detail || res.statusText,
+    );
+  }
+  return res;
+}
+
 export const api = {
   auth: {
     login: (username: string, password: string) =>
@@ -231,6 +278,12 @@ export const api = {
       fetchJSON<DebugSearchResponse>("/api/search", { method: "POST", body: params }),
     queryDebug: (params: SearchRequest) =>
       fetchJSON<DebugSearchResponse>("/api/search/debug", { method: "POST", body: params }),
+    queryWithCacheInfo: async (params: SearchRequest) => {
+      const res = await fetchWithResponse("/api/search", { method: "POST", body: params });
+      const data = (await res.json()) as DebugSearchResponse;
+      data.cache_hit = res.headers.get("X-Cache") === "HIT";
+      return data;
+    },
   },
   settings: {
     get: () =>
@@ -269,6 +322,10 @@ export const api = {
       fetchJSON<Trace>(`/api/monitoring/traces/${id}`),
     costs: (params?: { start_date?: string; end_date?: string }) =>
       fetchJSON<CostEntry>("/api/monitoring/costs", { params: params as Record<string, unknown> }),
+    cache: () =>
+      fetchJSON<CacheMetrics>("/api/monitoring/cache"),
+    clearCache: () =>
+      fetchJSON<CacheClearResponse>("/api/monitoring/cache", { method: "DELETE" }),
   },
   watcher: {
     status: () =>

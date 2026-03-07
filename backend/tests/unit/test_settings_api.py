@@ -71,7 +71,8 @@ async def test_settings_cache_invalidation():
     """업데이트 후 캐시 반영 확인."""
     service = SettingsService.__new__(SettingsService)
     service._db = None
-    service._cache = RAGSettings()
+    service._cache_svc = None
+    service._local_cache = RAGSettings()
     service._cache_time = 9999999999.0  # 미래 (캐시 유효)
 
     # 캐시된 설정 반환 확인
@@ -82,4 +83,4 @@ async def test_settings_cache_invalidation():
     # 업데이트 시 캐시 무효화 확인
     with patch.object(service, "_save_to_db", new_callable=AsyncMock):
         await service.update_settings({"chunk_size": 2048})
-        assert service._cache is None  # 캐시 무효화됨
+        assert service._local_cache is None  # 캐시 무효화됨

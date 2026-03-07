@@ -11,12 +11,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useMonitoringStats, useTraces } from "@/lib/queries";
-import { FileText, Layers, MessageSquare, List, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useMonitoringStats, useTraces, useCacheMetrics, useClearCache } from "@/lib/queries";
+import { FileText, Layers, MessageSquare, List, BarChart3, Database, Trash2 } from "lucide-react";
 
 export default function MonitoringPage() {
   const { data: stats, isLoading: statsLoading } = useMonitoringStats();
   const { data: tracesData, isLoading: tracesLoading } = useTraces({ page: 1, size: 10 });
+  const { data: cacheData, isLoading: cacheLoading } = useCacheMetrics();
+  const clearCache = useClearCache();
 
   return (
     <div className="space-y-6">
@@ -84,6 +87,58 @@ export default function MonitoringPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cache metrics */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            캐시
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant={cacheData?.enabled ? "default" : "secondary"}>
+              {cacheData?.enabled ? "활성" : "비활성"}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => clearCache.mutate()}
+              disabled={clearCache.isPending || !cacheData?.enabled}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              비우기
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">히트율</p>
+              <p className="text-xl font-bold">
+                {cacheLoading ? "..." : `${((cacheData?.hit_rate ?? 0) * 100).toFixed(1)}%`}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">총 요청</p>
+              <p className="text-xl font-bold">
+                {cacheLoading ? "..." : (cacheData?.total_requests ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">캐시 항목</p>
+              <p className="text-xl font-bold">
+                {cacheLoading ? "..." : (cacheData?.cache_key_count ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">메모리</p>
+              <p className="text-xl font-bold">
+                {cacheLoading ? "..." : (cacheData?.used_memory_human ?? "N/A")}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent traces */}
       <Card>

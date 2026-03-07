@@ -17,6 +17,7 @@ from app.models.schemas import (
     SearchResponse,
     SearchResult,
 )
+from app.services.cache import CacheService
 from app.services.search.hybrid import HybridSearchOrchestrator
 from app.services.settings import SettingsService
 
@@ -25,6 +26,7 @@ router = APIRouter()
 # 글로벌 인스턴스 (lifespan에서 초기화)
 _orchestrator: HybridSearchOrchestrator | None = None
 _settings_service: SettingsService | None = None
+_cache_service: CacheService | None = None
 
 
 def set_orchestrator(orchestrator: HybridSearchOrchestrator) -> None:
@@ -47,6 +49,15 @@ def get_search_settings_service() -> SettingsService:
     if _settings_service is None:
         raise RuntimeError("Settings service not initialized")
     return _settings_service
+
+
+def set_cache_service(service: CacheService) -> None:
+    global _cache_service
+    _cache_service = service
+
+
+def get_cache_service() -> CacheService | None:
+    return _cache_service
 
 
 async def _apply_overrides(
@@ -84,15 +95,38 @@ async def search(
     base_settings = await settings_service.get_settings()
     settings = await _apply_overrides(base_settings, search_request)
 
+    cache = get_cache_service()
+
+    # 캐시 조회
+    if cache and settings.cache_enabled:
+        settings_hash = CacheService.compute_settings_hash(settings.model_dump())
+        cached = await cache.get_search(search_request.query, settings_hash)
+        if cached is not None:
+            request.state.cache_hit = True
+            return SearchResponse(**cached)
+
+    # 캐시 미스: 실제 검색 실행
     result = await orchestrator.search(
         search_request.query, settings, generate_answer=search_request.generate_answer,
     )
 
-    return SearchResponse(
+    response_data = SearchResponse(
         query=search_request.query,
         answer=result.answer or "",
         results=result.documents,
     )
+
+    # 캐시 저장
+    if cache and settings.cache_enabled:
+        settings_hash = CacheService.compute_settings_hash(settings.model_dump())
+        await cache.set_search(
+            search_request.query, settings_hash,
+            response_data.model_dump(),
+            ttl=settings.cache_search_ttl,
+        )
+
+    request.state.cache_hit = False
+    return response_data
 
 
 @router.post("/search/debug", response_model=DebugSearchResponse)

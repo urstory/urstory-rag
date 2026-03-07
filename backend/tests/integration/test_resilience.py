@@ -58,7 +58,10 @@ class TestOpenAIUnavailable:
         with patch("app.api.health.check_openai", return_value=False):
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
-            assert resp.json()["components"]["openai"] == "disconnected"
+            openai_comp = resp.json()["components"]["openai"]
+            # Phase 13: 컴포넌트가 객체({status, ...}) 또는 문자열일 수 있음
+            status = openai_comp["status"] if isinstance(openai_comp, dict) else openai_comp
+            assert status == "disconnected"
 
     @pytest.mark.asyncio
     async def test_models_endpoint_graceful(self, res_client, res_db):
@@ -87,9 +90,11 @@ class TestPartialFailure:
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
             data = resp.json()
-            assert data["components"]["elasticsearch"] == "disconnected"
-            assert data["components"]["openai"] == "disconnected"
-            assert data["components"]["redis"] == "disconnected"
+            def _status(comp):
+                return comp["status"] if isinstance(comp, dict) else comp
+            assert _status(data["components"]["elasticsearch"]) == "disconnected"
+            assert _status(data["components"]["openai"]) == "disconnected"
+            assert _status(data["components"]["redis"]) == "disconnected"
 
     @pytest.mark.asyncio
     async def test_health_all_connected(self, res_client, res_db):
@@ -103,7 +108,10 @@ class TestPartialFailure:
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
             data = resp.json()
-            assert all(v == "connected" for v in data["components"].values())
+            assert all(
+                (v["status"] if isinstance(v, dict) else v) == "connected"
+                for v in data["components"].values()
+            )
 
 
 class TestElasticsearchUnavailable:
@@ -115,7 +123,8 @@ class TestElasticsearchUnavailable:
         with patch("app.api.health.check_elasticsearch", return_value=False):
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
-            assert resp.json()["components"]["elasticsearch"] == "disconnected"
+            es_comp = resp.json()["components"]["elasticsearch"]
+            assert (es_comp["status"] if isinstance(es_comp, dict) else es_comp) == "disconnected"
 
     @pytest.mark.asyncio
     async def test_settings_available_without_es(self, res_client, res_db):
@@ -134,7 +143,8 @@ class TestRedisUnavailable:
         with patch("app.api.health.check_redis", return_value=False):
             resp = await res_client.get("/api/health")
             assert resp.status_code == 200
-            assert resp.json()["components"]["redis"] == "disconnected"
+            redis_comp = resp.json()["components"]["redis"]
+            assert (redis_comp["status"] if isinstance(redis_comp, dict) else redis_comp) == "disconnected"
 
     @pytest.mark.asyncio
     async def test_document_operations_without_redis(self, res_client, res_db):

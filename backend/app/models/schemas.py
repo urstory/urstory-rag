@@ -117,6 +117,8 @@ class SettingsResponse(BaseModel):
     hallucination_detection_enabled: bool
     retrieval_quality_gate_enabled: bool
     faithfulness_enabled: bool
+    cache_enabled: bool
+    cache_search_ttl: int
     llm_provider: str
     llm_model: str
     system_prompt: str
@@ -160,6 +162,8 @@ class SettingsUpdateRequest(BaseModel):
     hallucination_detection_enabled: bool | None = None
     retrieval_quality_gate_enabled: bool | None = None
     faithfulness_enabled: bool | None = None
+    cache_enabled: bool | None = None
+    cache_search_ttl: int | None = None
     llm_provider: str | None = None
     llm_model: str | None = None
     system_prompt: str | None = None

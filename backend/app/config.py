@@ -179,6 +179,10 @@ class RAGSettings(BaseModel):
             else:
                 object.__setattr__(self, flat, sub.enabled)
 
+    # 캐싱
+    cache_enabled: bool = True
+    cache_search_ttl: int = 3600  # 검색 캐시 TTL (초)
+
     # 답변 생성
     llm_provider: str = "openai"
     llm_model: str = "gpt-4.1-mini"

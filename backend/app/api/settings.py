@@ -15,7 +15,8 @@ _settings_service: SettingsService | None = None
 def get_settings_service(db: AsyncSession = Depends(get_db)) -> SettingsService:
     global _settings_service
     if _settings_service is None:
-        _settings_service = SettingsService(db)
+        from app.api.search import get_cache_service
+        _settings_service = SettingsService(db, cache=get_cache_service())
     _settings_service._db = db
     return _settings_service
 
@@ -36,6 +37,22 @@ async def patch_settings(
     _admin: User = Depends(require_admin),
 ):
     updated = await service.update_settings(updates.model_dump(exclude_unset=True))
+
+    # search API의 settings_service 인메모리 캐시도 무효화
+    from app.api.search import get_search_settings_service, get_cache_service
+    try:
+        search_ss = get_search_settings_service()
+        search_ss._local_cache = None
+        search_ss._cache_time = 0.0
+    except RuntimeError:
+        pass
+
+    # CacheService의 enabled/ttl도 동기화
+    cache = get_cache_service()
+    if cache:
+        cache.enabled = updated.cache_enabled
+        cache.default_ttl = updated.cache_search_ttl
+
     return updated.model_dump()
 
 

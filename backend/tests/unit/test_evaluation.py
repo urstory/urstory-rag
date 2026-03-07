@@ -1,6 +1,7 @@
 """Step 6.4-6.5 RED: 평가 데이터셋 및 실행 테스트."""
 from __future__ import annotations
 
+import os
 import uuid
 
 import pytest
@@ -14,7 +15,10 @@ from app.dependencies import get_current_user, require_admin
 
 # --- Fixtures (conftest.py의 test_db, client와 동일 패턴) ---
 
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 
 @pytest_asyncio.fixture

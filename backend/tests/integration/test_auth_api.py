@@ -1,4 +1,6 @@
 """인증 API 통합 테스트."""
+import os
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -9,7 +11,10 @@ from app.main import app
 from app.models.database import Base, User, get_db
 from app.services.auth import hash_password
 
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 
 @pytest.fixture(autouse=True)

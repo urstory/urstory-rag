@@ -1,4 +1,5 @@
 """복원력 테스트: 외부 서비스 장애 시 시스템 동작 검증."""
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,8 +11,9 @@ from app.main import app
 from app.models.database import Base, get_db
 from app.dependencies import get_current_user, require_admin
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
 )
 
 

@@ -1,6 +1,7 @@
 """통합 테스트: 전체 파이프라인 (업로드 → 인덱싱 → 검색 → 답변 → 가드레일 → 설정 → 평가)."""
 import io
 import json
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,8 +14,9 @@ from app.main import app
 from app.models.database import Base, Document, DocumentStatus, get_db
 from app.dependencies import get_current_user, require_admin
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
 )
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"

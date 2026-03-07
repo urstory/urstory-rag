@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,7 +21,10 @@ from app.main import app
 from app.models.database import Base, Document, DocumentStatus, EvaluationDataset, EvaluationRun, get_db
 from app.dependencies import get_current_user, require_admin
 
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 SAMPLE_DATASET = {
     "name": "통합 테스트 QA",

@@ -1,4 +1,5 @@
 """공통 테스트 Fixture."""
+import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
@@ -12,7 +13,10 @@ from app.models.database import Base, User, get_db
 from app.dependencies import get_current_user, require_admin
 
 # PostgreSQL 테스트 DB (Vector, JSONB 등 PostgreSQL 전용 타입 검증)
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 
 @pytest.fixture(autouse=True)

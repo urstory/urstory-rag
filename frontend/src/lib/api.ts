@@ -24,6 +24,7 @@ import type {
   CostEntry,
   SystemStatus,
   HealthCheck,
+  AdminUser,
 } from "@/types";
 
 const API_BASE = "";
@@ -37,6 +38,21 @@ class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+// 토큰 관리 — AuthProvider에서 설정
+let _getAccessToken: (() => string | null) | null = null;
+let _refreshAccessToken: (() => Promise<string | null>) | null = null;
+let _onAuthFailure: (() => void) | null = null;
+
+export function setAuthHelpers(helpers: {
+  getAccessToken: () => string | null;
+  refreshAccessToken: () => Promise<string | null>;
+  onAuthFailure: () => void;
+}) {
+  _getAccessToken = helpers.getAccessToken;
+  _refreshAccessToken = helpers.refreshAccessToken;
+  _onAuthFailure = helpers.onAuthFailure;
 }
 
 function buildQueryString(params?: Record<string, unknown>): string {
@@ -57,21 +73,48 @@ async function fetchJSON<T>(
     method?: string;
     body?: unknown;
     params?: Record<string, unknown>;
+    skipAuth?: boolean;
   },
 ): Promise<T> {
   const url = `${API_BASE}${path}${buildQueryString(options?.params)}`;
   const headers: Record<string, string> = {};
+
+  // Auth header
+  if (!options?.skipAuth) {
+    const token = _getAccessToken?.();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   if (options?.body) {
     headers["Content-Type"] = "application/json";
   }
+
   const init: RequestInit = {
     method: options?.method || "GET",
     headers,
+    credentials: "include",
   };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
   }
-  const res = await fetch(url, init);
+
+  let res = await fetch(url, init);
+
+  // 401 → try refresh
+  if (res.status === 401 && !options?.skipAuth && _refreshAccessToken) {
+    const newToken = await _refreshAccessToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      init.headers = headers;
+      res = await fetch(url, init);
+    } else {
+      _onAuthFailure?.();
+      throw new ApiError(401, "UNAUTHORIZED", "인증이 만료되었습니다.");
+    }
+  }
+
   if (!res.ok) {
     let errorData: { error?: string; message?: string; detail?: string } = {};
     try {
@@ -100,9 +143,18 @@ async function fetchFormData<T>(
   if (metadata) {
     formData.append("metadata", JSON.stringify(metadata));
   }
+
+  const headers: Record<string, string> = {};
+  const token = _getAccessToken?.();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     body: formData,
+    headers,
+    credentials: "include",
   });
   if (!res.ok) {
     let errorData: { error?: string; message?: string; detail?: string } = {};
@@ -121,6 +173,41 @@ async function fetchFormData<T>(
 }
 
 export const api = {
+  auth: {
+    login: (username: string, password: string) =>
+      fetchJSON<{ access_token: string }>("/api/auth/login", {
+        method: "POST",
+        body: { username, password },
+        skipAuth: true,
+      }),
+    signup: (username: string, name: string, password: string, email?: string) =>
+      fetchJSON<{ id: number; username: string }>("/api/auth/signup", {
+        method: "POST",
+        body: { username, name, password, email },
+        skipAuth: true,
+      }),
+    me: () => fetchJSON<{ id: number; username: string; email: string | null; name: string; role: string }>("/api/auth/me"),
+    updateProfile: (data: { name?: string; email?: string }) =>
+      fetchJSON<{ id: number; username: string; email: string | null; name: string; role: string; is_active: boolean }>("/api/auth/me", {
+        method: "PUT",
+        body: data,
+      }),
+    changePassword: (data: { current_password: string; new_password: string }) =>
+      fetchJSON<{ message: string }>("/api/auth/me/password", {
+        method: "PUT",
+        body: data,
+      }),
+  },
+  admin: {
+    listUsers: () =>
+      fetchJSON<{ items: AdminUser[]; total: number }>("/api/admin/users"),
+    createUser: (data: { username: string; name: string; password: string; role: string; email?: string }) =>
+      fetchJSON<AdminUser>("/api/admin/users", { method: "POST", body: data }),
+    updateUser: (id: number, data: { name?: string; email?: string; role?: string; is_active?: boolean }) =>
+      fetchJSON<AdminUser>(`/api/admin/users/${id}`, { method: "PUT", body: data }),
+    deleteUser: (id: number) =>
+      fetchJSON<{ message: string; id: number }>(`/api/admin/users/${id}`, { method: "DELETE" }),
+  },
   documents: {
     list: (params?: DocumentListParams) => {
       const { source, ...rest } = params ?? {};
@@ -201,7 +288,7 @@ export const api = {
   },
   system: {
     health: () =>
-      fetchJSON<HealthCheck>("/api/health"),
+      fetchJSON<HealthCheck>("/api/health", { skipAuth: true }),
     status: () =>
       fetchJSON<SystemStatus>("/api/system/status"),
     reindexAll: () =>

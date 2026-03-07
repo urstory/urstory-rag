@@ -1,5 +1,5 @@
 """Step 3.5: Celery 비동기 인덱싱 태스크 단위 테스트."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 
@@ -23,20 +23,10 @@ class TestCelerySetup:
 
 
 class TestIndexDocumentTask:
+    @patch("app.tasks.indexing._run_indexing", new_callable=AsyncMock)
     @patch("app.tasks.indexing.asyncio")
-    @patch("app.tasks.indexing.get_document_file_path")
-    @patch("app.tasks.indexing.create_processor")
-    def test_index_task_calls_processor(self, mock_create, mock_get_path, mock_asyncio):
-        """태스크가 processor.process를 호출하는지 확인."""
-        mock_processor = MagicMock()
-
-        # asyncio.run은 순서대로: get_file_path, create_processor, process
-        mock_asyncio.run.side_effect = [
-            "/uploads/test.txt",  # get_document_file_path
-            mock_processor,       # create_processor
-            None,                 # processor.process
-        ]
-
+    def test_index_task_calls_run_indexing(self, mock_asyncio, mock_run_indexing):
+        """태스크가 _run_indexing을 asyncio.run으로 호출하는지 확인."""
         index_document_task("doc-123")
 
-        assert mock_asyncio.run.call_count == 3
+        mock_asyncio.run.assert_called_once()

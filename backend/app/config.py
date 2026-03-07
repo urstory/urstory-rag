@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     redis_url: str = "redis://localhost:6379"
 
+    # 인증
+    jwt_secret_key: str = ""
+    admin_username: str = "admin"
+    admin_password: str = "ChangeMe1234!@#$"
+    allow_public_signup: bool = False
+    cors_origins: str = "http://localhost:3500"
+    rate_limit_enabled: bool = True
+
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     langfuse_public_key: str | None = None

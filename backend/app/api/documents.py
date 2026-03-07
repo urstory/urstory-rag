@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies import get_current_user, require_admin
 from app.exceptions import DocumentNotFoundError
-from app.models.database import Document, DocumentStatus, get_db
+from app.models.database import Document, DocumentStatus, User, get_db
 
 router = APIRouter(tags=["documents"])
 
@@ -24,6 +25,7 @@ async def list_documents(
     order: str = Query("desc"),
     source: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """문서 목록 (페이징)."""
     query = select(Document)
@@ -64,6 +66,7 @@ async def list_documents(
 async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """파일 업로드 → 즉시 응답 + 비동기 인덱싱."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -105,7 +108,7 @@ async def upload_document(
 
 
 @router.get("/documents/{doc_id}")
-async def get_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+async def get_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 상세."""
     doc = await db.get(Document, uuid.UUID(doc_id))
     if not doc:
@@ -114,7 +117,7 @@ async def get_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/documents/{doc_id}")
-async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 삭제."""
     doc = await db.get(Document, uuid.UUID(doc_id))
     if not doc:
@@ -130,7 +133,7 @@ async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/documents/{doc_id}/reindex")
-async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """단일 문서 재인덱싱."""
     doc = await db.get(Document, uuid.UUID(doc_id))
     if not doc:
@@ -146,7 +149,7 @@ async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/documents/{doc_id}/chunks")
-async def get_document_chunks(doc_id: str, db: AsyncSession = Depends(get_db)):
+async def get_document_chunks(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """청크 목록."""
     doc = await db.get(Document, uuid.UUID(doc_id))
     if not doc:

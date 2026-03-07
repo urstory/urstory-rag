@@ -9,7 +9,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import EvaluationDataset, EvaluationRun, get_db
+from app.dependencies import require_admin
+from app.models.database import EvaluationDataset, EvaluationRun, User, get_db
 
 router = APIRouter(tags=["evaluation"])
 
@@ -80,6 +81,7 @@ class EvaluationCompareResponse(BaseModel):
 async def create_dataset(
     body: DatasetCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     ds = EvaluationDataset(
         name=body.name,
@@ -97,7 +99,7 @@ async def create_dataset(
 
 
 @router.get("/evaluation/datasets", response_model=DatasetListResponse)
-async def list_datasets(db: AsyncSession = Depends(get_db)):
+async def list_datasets(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     count_result = await db.execute(select(func.count(EvaluationDataset.id)))
     total = count_result.scalar() or 0
 
@@ -121,7 +123,7 @@ async def list_datasets(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/evaluation/datasets/{dataset_id}", response_model=DatasetResponse)
-async def get_dataset(dataset_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_dataset(dataset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     result = await db.execute(
         select(EvaluationDataset).where(EvaluationDataset.id == dataset_id)
     )
@@ -143,6 +145,7 @@ async def get_dataset(dataset_id: uuid.UUID, db: AsyncSession = Depends(get_db))
 async def start_evaluation_run(
     body: EvaluationRunRequest,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     # 데이터셋 존재 확인
     ds_result = await db.execute(
@@ -171,7 +174,7 @@ async def start_evaluation_run(
 
 
 @router.get("/evaluation/runs", response_model=EvaluationRunListResponse)
-async def list_evaluation_runs(db: AsyncSession = Depends(get_db)):
+async def list_evaluation_runs(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     count_result = await db.execute(select(func.count(EvaluationRun.id)))
     total = count_result.scalar() or 0
 
@@ -187,7 +190,7 @@ async def list_evaluation_runs(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/evaluation/runs/{run_id}", response_model=EvaluationRunResponse)
-async def get_evaluation_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_evaluation_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     result = await db.execute(
         select(EvaluationRun).where(EvaluationRun.id == run_id)
     )
@@ -205,6 +208,7 @@ async def compare_evaluation_runs(
     run_id1: uuid.UUID,
     run_id2: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     result1 = await db.execute(
         select(EvaluationRun).where(EvaluationRun.id == run_id1)

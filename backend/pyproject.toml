@@ -5,8 +5,7 @@ requires-python = ">=3.12"
 description = "Korean RAG Production System"
 authors = [{name = "김성박", email = "urstory@fullstackfamily.com"}]
 license = {text = "MIT"}
-readme = "../README.md"
-repository = "https://github.com/urstory/urstory-rag"
+readme = {text = "", content-type = "text/markdown"}
 keywords = ["rag", "korean", "nlp", "haystack", "fastapi", "elasticsearch", "nori"]
 
 dependencies = [
@@ -17,6 +16,8 @@ dependencies = [
 
     # RAG 프레임워크
     "haystack-ai>=2.9",
+    "elasticsearch-haystack>=5.0",
+    "pgvector-haystack>=6.0",
 
     # DB
     "sqlalchemy[asyncio]>=2.0",
@@ -31,6 +32,7 @@ dependencies = [
     "transformers>=4.47",
     "sentence-transformers>=3.3",
     "torch>=2.5",
+    "accelerate>=1.0",
     "kiwipiepy>=0.18",
     "rank-bm25>=0.2",
 
@@ -57,6 +59,14 @@ dependencies = [
 
     # 디렉토리 감시
     "watchdog>=6.0",
+
+    # 인증
+    "bcrypt>=4.0",
+    "PyJWT>=2.8",
+    "email-validator>=2.0",
+
+    # Rate Limiting
+    "slowapi>=0.1.9",
 
     # 유틸리티
     "pydantic-settings>=2.7",

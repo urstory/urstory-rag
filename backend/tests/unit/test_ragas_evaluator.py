@@ -1,6 +1,7 @@
 """Step 6.5 RED: RAGAS 평가 엔진 단위 테스트."""
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.models.database import Base, EvaluationDataset, EvaluationRun
 
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 
 @pytest_asyncio.fixture

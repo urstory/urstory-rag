@@ -1,6 +1,7 @@
 """Step 6.6 RED: 모니터링 API 단위 테스트."""
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,8 +10,12 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.models.database import Base, get_db
+from app.dependencies import get_current_user, require_admin
 
-TEST_DATABASE_URL = "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test",
+)
 
 
 @pytest_asyncio.fixture
@@ -36,6 +41,8 @@ async def mon_client(mon_db):
         yield mon_db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
+    app.dependency_overrides[require_admin] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test",
     ) as ac:

@@ -38,6 +38,10 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **Langfuse 모니터링** | v3 풀 스택 (Web + Worker + ClickHouse + Redis + MinIO) 통합 |
 | **관리자 UI** | Next.js 15 + React 19 + shadcn/ui 기반 대시보드 |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
+| **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |
+| **보안 헤더** | X-Content-Type-Options, X-Frame-Options, CSP 등 보안 미들웨어 |
+| **Rate Limiting** | slowapi 기반 엔드포인트별 요청 제한 (로그인 5/min, 검색 30/min) |
+| **CORS 화이트리스트** | 환경변수 기반 허용 오리진 관리 (`allow_origins=["*"]` 제거) |
 
 ---
 
@@ -132,9 +136,15 @@ OPENAI_API_KEY=sk-your-openai-api-key
 # 필수: PostgreSQL 비밀번호 (원하는 값으로 변경)
 POSTGRES_PASSWORD=changeme_strong_password
 
+# 선택: 초기 관리자 계정 (미설정 시 기본값 사용)
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=ChangeMe1234!@#$
+
 # 선택: Langfuse 암호화 키 (64자 hex, 프로덕션에서는 반드시 변경)
 LANGFUSE_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
 ```
+
+> **초기 관리자 계정**: 서버 최초 기동 시 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 환경변수로 관리자 계정이 자동 생성된다. 환경변수를 설정하지 않으면 기본값 `admin` / `ChangeMe1234!@#$`이 사용되며, 로그에 경고가 출력된다. **프로덕션에서는 반드시 변경할 것.**
 
 ### Step 3: 공유 인프라 실행
 

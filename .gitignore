@@ -54,6 +54,7 @@ uploads/
 docs/*
 !docs/architecture/
 !docs/images/
+!docs/rag_quality_test_report_public_*.md
 
 # 테스트 결과 파일 (런타임 생성)
 test_files/quality_test_results*.json

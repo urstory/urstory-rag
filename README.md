@@ -20,7 +20,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 - **관리자 UI에서 모든 기능 ON/OFF 제어**: 리랭킹, HyDE, 가드레일, 검색 전략 등을 코드 변경 없이 관리자 UI에서 실시간 토글할 수 있다.
 - **자동 품질 평가**: RAGAS + LLM-as-Judge로 검색/생성 품질을 자동 측정하고, Langfuse로 전체 파이프라인을 모니터링한다.
 
-90개 Q&A 테스트 세트에서 **LLM Judge 평균 94.4점, GOOD 비율 97%, 검색 적중률 100%**를 달성했다.
+공개 테스트 데이터셋(68개 Q&A, 10개 공공 문서)에서 **LLM Judge 평균 90.3점, GOOD 비율 95.2%**를 달성했다.
 
 ---
 
@@ -252,7 +252,10 @@ urstory-rag/
 │   └── init-db.sql             # DB 초기화 (pgvector 확장)
 ├── docs/                       # 아키텍처 문서
 │   └── architecture/           # 10개 아키텍처 문서
-├── test_files/                 # RAG 품질 테스트 (직접 준비 필요, git 미포함)
+├── test_files/                 # RAG 품질 테스트
+│   ├── public_dataset/         #   공개 테스트 데이터셋 (공공누리 제1유형 PDF + MD)
+│   ├── run_quality_test.py     #   품질 테스트 스크립트
+│   └── q_a_public.txt          #   68개 Q&A 쌍
 ├── docker-compose.yml          # 앱 서비스 (API + Langfuse v3)
 ├── Makefile                    # 개발 편의 명령어
 └── .env.example                # 환경 변수 템플릿
@@ -262,31 +265,24 @@ urstory-rag/
 
 ## RAG 품질 테스트
 
-`test_files/` 디렉토리는 저작권 및 보안상의 이유로 **git에 포함되지 않는다**. 품질 테스트를 실행하려면 직접 테스트 데이터를 준비해야 한다.
+이 프로젝트는 **공개 테스트 데이터셋**을 포함하고 있어, 누구나 동일한 조건에서 RAG 품질을 재현할 수 있다.
 
-### 테스트 데이터 준비
+### 공개 테스트 데이터셋
 
-1. `test_files/` 디렉토리를 생성한다.
+`test_files/public_dataset/`에 저작권 없는 공공 문서 10개와 68개 Q&A가 포함되어 있다:
 
-2. **테스트 문서**: RAG에 업로드할 PDF 또는 Markdown 파일을 준비한다.
-   - 구체적 수치, 고유명사, 절차를 포함한 실제 업무 문서가 적합하다.
-   - 예시: 사내 규정집, 제품 매뉴얼, 기술 가이드 등
+- **Markdown 5개**: 한글 창제, 한국 지리, 유네스코 유산, 발효 식품, 우주 개발 (직접 작성)
+- **PDF 5개**: 한국은행, 기상청, 통계청 공공 보고서 (공공누리 제1유형)
+- **Q&A 68개**: `test_files/q_a_public.txt` (Markdown 32문제 + PDF 36문제)
 
-3. **Q&A 파일**: `test_files/q_a.txt` 형식으로 질문-정답 쌍을 작성한다.
-
-```
-**Q1. 질문 내용?**
-A: 기대하는 정답 내용.
-
-**Q2. 또 다른 질문?**
-A: 기대하는 정답 내용.
-```
-
-4. **테스트 스크립트**: `test_files/run_quality_test.py`에서 `QA_SET1` 배열에 Q&A 쌍을 등록한다.
+자세한 내용은 [`test_files/public_dataset/README.md`](test_files/public_dataset/README.md) 참조.
 
 ### 테스트 실행
 
 ```bash
+# 1. 공개 데이터셋 문서를 관리자 UI에서 업로드
+# 2. 인덱싱 완료 대기
+# 3. 품질 테스트 실행
 cd backend
 .venv/bin/python ../test_files/run_quality_test.py
 ```
@@ -298,16 +294,18 @@ cd backend
 | LLM-as-Judge (GPT-4o) | 메인 지표 | 의미적 정확도를 0~100점으로 판정 |
 | 키워드 재현율 | 보조 지표 | 숫자/고유명사 exact match |
 
-### 참고: 개발 중 달성한 품질
+### 품질 테스트 결과 (2026-03-07)
 
-90개 Q&A (PDF 30 + MD 30 + 블라인드 30)로 테스트한 결과:
+공개 데이터셋 68개 Q&A, 10개 문서(2,239 청크) 기준:
 
 | 지표 | 결과 |
 |------|------|
-| LLM Judge 평균 점수 | **94.4 / 100** |
-| GOOD (70점 이상) | **87 / 90 (97%)** |
-| FAIL (40점 미만) | 1 / 90 (1%) |
-| 검색 적중률 | **100%** |
+| LLM Judge 평균 점수 | **90.3 / 100** |
+| GOOD (70점 이상) | **60 / 63 (95.2%)** |
+| FAIL (40점 미만) | 3 / 63 (4.8%) |
+| 키워드 재현율 | 60.8% |
+
+상세 분석은 [`docs/rag_quality_test_report_public_20260307.md`](docs/rag_quality_test_report_public_20260307.md) 참조.
 
 ---
 

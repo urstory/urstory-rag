@@ -121,6 +121,7 @@ export interface PipelineStep {
 
 export interface DebugSearchResponse extends SearchResponse {
   pipeline_trace: PipelineStep[];
+  cache_hit?: boolean;
 }
 
 // ========== Settings ==========
@@ -174,6 +175,9 @@ export interface RAGSettings {
   llm_provider: string;
   llm_model: string;
   system_prompt: string;
+  // 캐싱
+  cache_enabled?: boolean;
+  cache_search_ttl?: number;
   // 백엔드가 추가로 반환하는 필드 (읽기전용)
   guardrails?: Record<string, unknown>;
 }
@@ -274,6 +278,20 @@ export interface CostEntry {
   total_cost: number;
   period: string;
   breakdown: Record<string, unknown>[];
+}
+
+export interface CacheMetrics {
+  enabled: boolean;
+  hits: number;
+  misses: number;
+  hit_rate: number;
+  total_requests: number;
+  cache_key_count: number;
+  used_memory_human: string;
+}
+
+export interface CacheClearResponse {
+  cleared: number;
 }
 
 // ========== System ==========

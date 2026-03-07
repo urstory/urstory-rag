@@ -73,16 +73,7 @@ def validate_password_strength(password: str) -> None:
 
 # --- Redis 토큰 블랙리스트 ---
 
-_redis_client = None
-
-
-async def _get_redis():
-    global _redis_client
-    if _redis_client is None:
-        import redis.asyncio as aioredis
-        env = get_settings()
-        _redis_client = aioredis.from_url(env.redis_url, decode_responses=True)
-    return _redis_client
+from app.redis import get_redis as _get_redis
 
 
 async def blacklist_token(jti: str, ttl_seconds: int) -> None:

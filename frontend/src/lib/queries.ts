@@ -25,6 +25,7 @@ import type {
   EvaluationComparison,
   Trace,
   CostEntry,
+  CacheMetrics,
   AvailableModels,
   AdminUser,
 } from "@/types";
@@ -250,6 +251,24 @@ export function useCosts(params?: { start_date?: string; end_date?: string }) {
   return useQuery<CostEntry>({
     queryKey: ["monitoring", "costs", params],
     queryFn: () => api.monitoring.costs(params),
+  });
+}
+
+export function useCacheMetrics() {
+  return useQuery<CacheMetrics>({
+    queryKey: ["monitoring", "cache"],
+    queryFn: () => api.monitoring.cache(),
+    refetchInterval: 30000,
+  });
+}
+
+export function useClearCache() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.monitoring.clearCache(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monitoring", "cache"] });
+    },
   });
 }
 

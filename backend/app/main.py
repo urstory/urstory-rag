@@ -145,6 +145,14 @@ async def lifespan(app: FastAPI):
     settings_service = SettingsService(db=settings_session)
     search_api.set_search_settings_service(settings_service)
 
+    # 캐시 서비스 초기화
+    from app.services.cache import CacheService
+    cache_service = CacheService(
+        default_ttl=_rag.cache_search_ttl,
+        enabled=_rag.cache_enabled,
+    )
+    search_api.set_cache_service(cache_service)
+
     # Startup 완료
     app.state.startup_complete = True
     app.state.shutting_down = False
@@ -158,6 +166,9 @@ async def lifespan(app: FastAPI):
     logger.info("graceful_shutdown_started")
 
     await asyncio.sleep(1)
+
+    from app.redis import close_redis
+    await close_redis()
 
     await settings_session.close()
     app.state.langfuse_monitor.flush()
@@ -183,6 +194,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# 캐시 헤더
+from app.middleware.cache_header import CacheHeaderMiddleware
+app.add_middleware(CacheHeaderMiddleware)
 
 # 보안 헤더
 app.add_middleware(SecurityHeadersMiddleware)

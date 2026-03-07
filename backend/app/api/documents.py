@@ -14,6 +14,15 @@ from app.models.database import Document, DocumentStatus, User, get_db
 
 router = APIRouter(tags=["documents"])
 
+
+async def _invalidate_document_caches() -> None:
+    """문서 변경 시 관련 캐시 무효화."""
+    from app.api.search import get_cache_service
+    cache = get_cache_service()
+    if cache:
+        await cache.invalidate_search()
+        await cache.invalidate_stats()
+
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
 
@@ -104,6 +113,7 @@ async def upload_document(
     except Exception:
         status = "uploaded"
 
+    await _invalidate_document_caches()
     return {"id": str(doc.id), "status": status, "filename": doc.filename}
 
 
@@ -129,6 +139,7 @@ async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admi
 
     await db.delete(doc)
     await db.commit()
+    await _invalidate_document_caches()
     return {"message": "deleted", "id": doc_id}
 
 
@@ -145,6 +156,7 @@ async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _adm
     except Exception:
         pass
 
+    await _invalidate_document_caches()
     return {"id": doc_id, "status": "reindexing"}
 
 

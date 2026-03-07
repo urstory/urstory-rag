@@ -7,7 +7,7 @@ from app.main import app
 
 @pytest.mark.asyncio
 async def test_health_endpoint():
-    """GET /api/health → 200 {"status": "ok"} 확인."""
+    """GET /api/health → 200 + status 필드 확인."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -15,4 +15,4 @@ async def test_health_endpoint():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "ok"
+    assert data["status"] in ("ok", "degraded")

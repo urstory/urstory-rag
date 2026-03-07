@@ -1,0 +1,32 @@
+services:
+  rag-api:
+    image: ghcr.io/urstory/urstory-rag-api:${TAG:-latest}
+    build:
+      context: ./backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 35s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  rag-frontend:
+    image: ghcr.io/urstory/urstory-rag-frontend:${TAG:-latest}
+    build:
+      context: ./frontend
+    ports:
+      - "3500:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://rag-api:8000}
+    restart: unless-stopped

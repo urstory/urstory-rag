@@ -1,9 +1,19 @@
+import importlib.metadata
+
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 
 router = APIRouter()
+
+
+def _get_version() -> str:
+    try:
+        return importlib.metadata.version("urstory-rag")
+    except importlib.metadata.PackageNotFoundError:
+        return "dev"
 
 
 async def check_db() -> bool:
@@ -67,17 +77,80 @@ async def check_redis() -> bool:
 
 @router.get("/health")
 async def health_check():
+    """전체 시스템 상태 (관리자 대시보드용)."""
     db_ok = await check_db()
     es_ok = await check_elasticsearch()
     openai_ok = await check_openai()
     redis_ok = await check_redis()
 
+    required_ok = db_ok and es_ok and redis_ok
+
     return {
-        "status": "ok",
+        "status": "ok" if required_ok else "degraded",
+        "version": _get_version(),
         "components": {
-            "database": "connected" if db_ok else "disconnected",
-            "elasticsearch": "connected" if es_ok else "disconnected",
-            "openai": "connected" if openai_ok else "disconnected",
-            "redis": "connected" if redis_ok else "disconnected",
+            "database": {
+                "status": "connected" if db_ok else "disconnected",
+                "required": True,
+                "description": "PostgreSQL + PGVector (문서/벡터 저장소)",
+                "impact": "disconnected 시 모든 기능 비활성화",
+            },
+            "elasticsearch": {
+                "status": "connected" if es_ok else "disconnected",
+                "required": True,
+                "description": "Elasticsearch + Nori (키워드 검색)",
+                "impact": "disconnected 시 키워드 검색 비활성화",
+            },
+            "redis": {
+                "status": "connected" if redis_ok else "disconnected",
+                "required": True,
+                "description": "Redis (세션, 작업 큐, 토큰 블랙리스트)",
+                "impact": "disconnected 시 로그인/로그아웃 장애 가능",
+            },
+            "openai": {
+                "status": "connected" if openai_ok else "disconnected",
+                "required": False,
+                "description": "OpenAI API (임베딩, LLM 생성, 평가)",
+                "impact": "disconnected 시 검색/답변 생성 불가 (기존 인덱스 검색은 가능)",
+            },
         },
     }
+
+
+@router.get("/health/live")
+async def liveness():
+    """Liveness Probe — 프로세스 생존 확인."""
+    return {"status": "ok"}
+
+
+@router.get("/health/ready")
+async def readiness():
+    """Readiness Probe — DB, ES, Redis 연결 확인."""
+    db_ok = await check_db()
+    es_ok = await check_elasticsearch()
+    redis_ok = await check_redis()
+
+    all_ok = db_ok and es_ok and redis_ok
+    status_code = 200 if all_ok else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ready" if all_ok else "not_ready",
+            "components": {
+                "database": "ok" if db_ok else "fail",
+                "elasticsearch": "ok" if es_ok else "fail",
+                "redis": "ok" if redis_ok else "fail",
+            },
+        },
+    )
+
+
+@router.get("/health/startup")
+async def startup_check(request: Request):
+    """Startup Probe — 초기화 완료 확인."""
+    ready = getattr(request.app.state, "startup_complete", False)
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "started" if ready else "starting"},
+    )

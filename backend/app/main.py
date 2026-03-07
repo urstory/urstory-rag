@@ -1,4 +1,6 @@
-import logging
+import asyncio
+
+import structlog
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -12,13 +14,17 @@ from app.api import documents, evaluation, health, monitoring, search, settings,
 from app.api import admin, auth
 from app.config import get_settings
 from app.exceptions import RAGException
+from app.logging_config import setup_logging
+from app.middleware.logging import RequestLoggingMiddleware
 from app.middleware.rate_limit import init_limiter, limiter
 from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.shutdown import ShutdownMiddleware
 from app.models.database import User, init_db
 from app.monitoring.langfuse import LangfuseMonitor
+from app.sentry_config import init_sentry
 from app.services.auth import hash_password, validate_password_strength
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 async def _ensure_admin_user(session):
@@ -39,15 +45,29 @@ async def _ensure_admin_user(session):
     )
     session.add(admin_user)
     await session.commit()
-    logger.info("초기 관리자 계정 생성됨: %s", env.admin_username)
+    logger.info("admin_user_created", username=env.admin_username)
 
     if env.admin_password == "ChangeMe1234!@#$":
-        logger.warning("기본 관리자 비밀번호 사용 중. 즉시 변경하세요!")
+        logger.warning("default_admin_password", message="기본 관리자 비밀번호 사용 중. 즉시 변경하세요!")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     env = get_settings()
+
+    # 로깅 초기화 (가장 먼저)
+    setup_logging(
+        log_level=env.log_level,
+        json_format=(env.log_format == "json"),
+    )
+
+    # Sentry 초기화
+    init_sentry(
+        dsn=env.sentry_dsn,
+        environment=env.sentry_environment,
+        traces_sample_rate=env.sentry_traces_sample_rate,
+    )
+
     init_db(env.database_url)
 
     # Langfuse 모니터 초기화
@@ -64,7 +84,7 @@ async def lifespan(app: FastAPI):
             async with _async_session_factory() as session:
                 await _ensure_admin_user(session)
         except Exception as e:
-            logger.warning("초기 관리자 생성 실패: %s", e)
+            logger.warning("admin_creation_failed", error=str(e))
 
     # 검색 오케스트레이터 초기화
     from app.api import search as search_api
@@ -125,11 +145,30 @@ async def lifespan(app: FastAPI):
     settings_service = SettingsService(db=settings_session)
     search_api.set_search_settings_service(settings_service)
 
+    # Startup 완료
+    app.state.startup_complete = True
+    app.state.shutting_down = False
+    logger.info("application_started")
+
     yield
 
-    # 종료 시 정리
+    # --- Graceful Shutdown ---
+    app.state.shutting_down = True
+    app.state.startup_complete = False
+    logger.info("graceful_shutdown_started")
+
+    await asyncio.sleep(1)
+
     await settings_session.close()
     app.state.langfuse_monitor.flush()
+
+    from app.models.database import get_engine
+    engine = get_engine()
+    if engine:
+        await engine.dispose()
+        logger.info("db_engine_disposed")
+
+    logger.info("graceful_shutdown_completed")
 
 
 app = FastAPI(title="UrstoryRAG", version="0.1.0", lifespan=lifespan)
@@ -148,6 +187,12 @@ app.add_middleware(
 # 보안 헤더
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Shutdown 미들웨어
+app.add_middleware(ShutdownMiddleware)
+
+# 요청 로깅 미들웨어
+app.add_middleware(RequestLoggingMiddleware)
+
 # Rate Limiting
 init_limiter()
 app.state.limiter = limiter
@@ -156,9 +201,24 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(RAGException)
 async def rag_exception_handler(request: Request, exc: RAGException):
+    request_id = request.headers.get("X-Request-ID", "unknown")
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.error_code, "message": str(exc)},
+        content={"error": exc.error_code, "message": str(exc), "request_id": request_id},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    request_id = request.headers.get("X-Request-ID", "unknown")
+    logger.error("unhandled_exception", error=str(exc), request_id=request_id)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_error",
+            "message": "내부 오류가 발생했습니다.",
+            "request_id": request_id,
+        },
     )
 
 

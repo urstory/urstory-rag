@@ -5,9 +5,12 @@ POST /api/search/debug → 검색 + 파이프라인 트레이스 포함
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.config import RAGSettings
+from app.dependencies import get_current_user
+from app.middleware.rate_limit import limiter
+from app.models.database import User
 from app.models.schemas import (
     DebugSearchResponse,
     SearchRequest,
@@ -69,42 +72,48 @@ async def _apply_overrides(
 
 
 @router.post("/search", response_model=SearchResponse)
+@limiter.limit("30/minute")
 async def search(
-    request: SearchRequest,
+    request: Request,
+    search_request: SearchRequest,
     orchestrator: HybridSearchOrchestrator = Depends(get_orchestrator),
     settings_service: SettingsService = Depends(get_search_settings_service),
+    _user: User = Depends(get_current_user),
 ):
     """검색 + 답변 생성 API."""
     base_settings = await settings_service.get_settings()
-    settings = await _apply_overrides(base_settings, request)
+    settings = await _apply_overrides(base_settings, search_request)
 
     result = await orchestrator.search(
-        request.query, settings, generate_answer=request.generate_answer,
+        search_request.query, settings, generate_answer=search_request.generate_answer,
     )
 
     return SearchResponse(
-        query=request.query,
+        query=search_request.query,
         answer=result.answer or "",
         results=result.documents,
     )
 
 
 @router.post("/search/debug", response_model=DebugSearchResponse)
+@limiter.limit("30/minute")
 async def search_debug(
-    request: SearchRequest,
+    request: Request,
+    search_request: SearchRequest,
     orchestrator: HybridSearchOrchestrator = Depends(get_orchestrator),
     settings_service: SettingsService = Depends(get_search_settings_service),
+    _user: User = Depends(get_current_user),
 ):
     """검색 + 파이프라인 트레이스 포함 디버그 API."""
     base_settings = await settings_service.get_settings()
-    settings = await _apply_overrides(base_settings, request)
+    settings = await _apply_overrides(base_settings, search_request)
 
     result = await orchestrator.search(
-        request.query, settings, generate_answer=request.generate_answer,
+        search_request.query, settings, generate_answer=search_request.generate_answer,
     )
 
     return DebugSearchResponse(
-        query=request.query,
+        query=search_request.query,
         answer=result.answer or "",
         results=result.documents,
         pipeline_trace=result.trace,

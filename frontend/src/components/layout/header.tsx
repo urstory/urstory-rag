@@ -1,9 +1,11 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSystemStatus } from "@/lib/queries";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -11,6 +13,8 @@ interface HeaderProps {
 
 export function Header({ onMenuToggle }: HeaderProps) {
   const { data: systemStatus } = useSystemStatus();
+  const { user, logout } = useAuth();
+  const router = useRouter();
 
   const statusColor = !systemStatus
     ? "bg-gray-400"
@@ -28,6 +32,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
         ? "일부 장애"
         : "장애";
 
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
   return (
     <header className="flex h-14 items-center justify-between border-b px-4">
       <div className="flex items-center gap-3">
@@ -41,12 +50,27 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </Button>
         <span className="text-sm font-medium md:hidden">UrstoryRAG</span>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">시스템 상태</span>
-        <Badge variant="outline" className="gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${statusColor}`} />
-          {statusLabel}
-        </Badge>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">시스템 상태</span>
+          <Badge variant="outline" className="gap-1.5">
+            <span className={`h-2 w-2 rounded-full ${statusColor}`} />
+            {statusLabel}
+          </Badge>
+        </div>
+        {user && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {user.name}
+              {user.role === "admin" && (
+                <Badge variant="secondary" className="ml-1 text-[10px]">admin</Badge>
+              )}
+            </span>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="로그아웃">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );

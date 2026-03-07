@@ -1,14 +1,48 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy import func, select
 
 from app.api import documents, evaluation, health, monitoring, search, settings, system, watcher
+from app.api import admin, auth
 from app.config import get_settings
 from app.exceptions import RAGException
-from app.models.database import init_db
+from app.middleware.rate_limit import init_limiter, limiter
+from app.middleware.security import SecurityHeadersMiddleware
+from app.models.database import User, init_db
 from app.monitoring.langfuse import LangfuseMonitor
+from app.services.auth import hash_password, validate_password_strength
+
+logger = logging.getLogger(__name__)
+
+
+async def _ensure_admin_user(session):
+    """users 테이블이 비어있으면 환경변수에서 관리자 자동 생성."""
+    count = await session.scalar(select(func.count(User.id)))
+    if count > 0:
+        return
+
+    env = get_settings()
+    validate_password_strength(env.admin_password)
+
+    admin_user = User(
+        email=env.admin_email,
+        hashed_password=hash_password(env.admin_password),
+        name="관리자",
+        role="admin",
+        is_active=True,
+    )
+    session.add(admin_user)
+    await session.commit()
+    logger.info("초기 관리자 계정 생성됨: %s", env.admin_email)
+
+    if env.admin_password == "ChangeMe1234!@#$":
+        logger.warning("기본 관리자 비밀번호 사용 중. 즉시 변경하세요!")
 
 
 @asynccontextmanager
@@ -23,9 +57,17 @@ async def lifespan(app: FastAPI):
         host=env.langfuse_host,
     )
 
+    # 초기 관리자 자동 생성
+    from app.models.database import _async_session_factory
+    if _async_session_factory:
+        try:
+            async with _async_session_factory() as session:
+                await _ensure_admin_user(session)
+        except Exception as e:
+            logger.warning("초기 관리자 생성 실패: %s", e)
+
     # 검색 오케스트레이터 초기화
     from app.api import search as search_api
-    from app.models.database import _async_session_factory
     from app.services.generation.evidence_extractor import EvidenceExtractor
     from app.services.guardrails.numeric_verifier import NumericVerifier
     from app.services.hyde.generator import HyDEGenerator
@@ -92,13 +134,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="UrstoryRAG", version="0.1.0", lifespan=lifespan)
 
+# CORS — 환경변수 기반 화이트리스트
+env = get_settings()
+origins = [o.strip() for o in env.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# 보안 헤더
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate Limiting
+init_limiter()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.exception_handler(RAGException)
@@ -109,11 +162,18 @@ async def rag_exception_handler(request: Request, exc: RAGException):
     )
 
 
+# 공개 라우터
 app.include_router(health.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+
+# 인증 필요 라우터
+app.include_router(search.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 app.include_router(watcher.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
-app.include_router(search.router, prefix="/api")
 app.include_router(evaluation.router, prefix="/api")
 app.include_router(monitoring.router, prefix="/api")
+
+# 관리자 전용 라우터
+app.include_router(admin.router, prefix="/api")

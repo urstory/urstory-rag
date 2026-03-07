@@ -1,13 +1,15 @@
 """감시 제어 API 엔드포인트."""
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.dependencies import require_admin
+from app.models.database import User
 from app.services.document.watcher import get_watcher_service
 
 router = APIRouter(tags=["watcher"])
 
 
 @router.get("/watcher/status")
-async def get_watcher_status():
+async def get_watcher_status(_admin: User = Depends(require_admin)):
     """감시 상태 조회."""
     service = get_watcher_service()
     return service.get_status()
@@ -17,6 +19,7 @@ async def get_watcher_status():
 async def start_watcher(
     directories: list[str] | None = Query(default=None),
     use_polling: bool = False,
+    _admin: User = Depends(require_admin),
 ):
     """감시 시작."""
     service = get_watcher_service()
@@ -32,7 +35,7 @@ async def start_watcher(
 
 
 @router.post("/watcher/stop")
-async def stop_watcher():
+async def stop_watcher(_admin: User = Depends(require_admin)):
     """감시 중지."""
     service = get_watcher_service()
     await service.stop()
@@ -40,7 +43,7 @@ async def stop_watcher():
 
 
 @router.post("/watcher/scan")
-async def trigger_scan():
+async def trigger_scan(_admin: User = Depends(require_admin)):
     """수동 전체 스캔."""
     service = get_watcher_service()
     scanner = service.scanner

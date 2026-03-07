@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.settings import get_settings_service
 from app.config import RAGSettings
+from app.dependencies import get_current_user, require_admin
 from app.main import app
 from app.services.settings import SettingsService
 
@@ -17,6 +18,8 @@ async def test_get_default_settings():
     mock_service.get_settings.return_value = RAGSettings()
 
     app.dependency_overrides[get_settings_service] = lambda: mock_service
+    app.dependency_overrides[get_current_user] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
+    app.dependency_overrides[require_admin] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -44,6 +47,8 @@ async def test_patch_settings():
     mock_service.update_settings.return_value = updated
 
     app.dependency_overrides[get_settings_service] = lambda: mock_service
+    app.dependency_overrides[get_current_user] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
+    app.dependency_overrides[require_admin] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

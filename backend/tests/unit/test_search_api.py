@@ -11,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from app.config import RAGSettings
 from app.main import app
 from app.api.search import get_orchestrator, get_search_settings_service
+from app.dependencies import get_current_user, require_admin
 from app.models.schemas import PipelineStep, SearchPipelineResult, SearchResult
 
 # 테스트용 데이터
@@ -59,6 +60,8 @@ async def client(mock_orchestrator, mock_settings_service):
     """FastAPI TestClient with mocked dependencies via dependency_overrides."""
     app.dependency_overrides[get_orchestrator] = lambda: mock_orchestrator
     app.dependency_overrides[get_search_settings_service] = lambda: mock_settings_service
+    app.dependency_overrides[get_current_user] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
+    app.dependency_overrides[require_admin] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

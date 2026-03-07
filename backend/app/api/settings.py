@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings as get_env_settings
-from app.models.database import get_db
+from app.dependencies import require_admin
+from app.models.database import User, get_db
 from app.models.schemas import SettingsResponse, SettingsUpdateRequest
 from app.services.settings import SettingsService
 
@@ -20,7 +21,10 @@ def get_settings_service(db: AsyncSession = Depends(get_db)) -> SettingsService:
 
 
 @router.get("/settings", response_model=SettingsResponse)
-async def get_settings(service: SettingsService = Depends(get_settings_service)):
+async def get_settings(
+    service: SettingsService = Depends(get_settings_service),
+    _admin: User = Depends(require_admin),
+):
     settings = await service.get_settings()
     return settings.model_dump()
 
@@ -29,13 +33,14 @@ async def get_settings(service: SettingsService = Depends(get_settings_service))
 async def patch_settings(
     updates: SettingsUpdateRequest,
     service: SettingsService = Depends(get_settings_service),
+    _admin: User = Depends(require_admin),
 ):
     updated = await service.update_settings(updates.model_dump(exclude_unset=True))
     return updated.model_dump()
 
 
 @router.get("/settings/models")
-async def get_available_models():
+async def get_available_models(_admin: User = Depends(require_admin)):
     env = get_env_settings()
     models = {"openai": [], "embedding": []}
 

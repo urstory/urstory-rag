@@ -58,6 +58,14 @@ dependencies = [
     # 디렉토리 감시
     "watchdog>=6.0",
 
+    # 인증
+    "bcrypt>=4.0",
+    "PyJWT>=2.8",
+    "email-validator>=2.0",
+
+    # Rate Limiting
+    "slowapi>=0.1.9",
+
     # 유틸리티
     "pydantic-settings>=2.7",
     "python-dotenv>=1.0",

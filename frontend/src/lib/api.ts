@@ -39,6 +39,21 @@ class ApiError extends Error {
   }
 }
 
+// 토큰 관리 — AuthProvider에서 설정
+let _getAccessToken: (() => string | null) | null = null;
+let _refreshAccessToken: (() => Promise<string | null>) | null = null;
+let _onAuthFailure: (() => void) | null = null;
+
+export function setAuthHelpers(helpers: {
+  getAccessToken: () => string | null;
+  refreshAccessToken: () => Promise<string | null>;
+  onAuthFailure: () => void;
+}) {
+  _getAccessToken = helpers.getAccessToken;
+  _refreshAccessToken = helpers.refreshAccessToken;
+  _onAuthFailure = helpers.onAuthFailure;
+}
+
 function buildQueryString(params?: Record<string, unknown>): string {
   if (!params) return "";
   const searchParams = new URLSearchParams();
@@ -57,21 +72,48 @@ async function fetchJSON<T>(
     method?: string;
     body?: unknown;
     params?: Record<string, unknown>;
+    skipAuth?: boolean;
   },
 ): Promise<T> {
   const url = `${API_BASE}${path}${buildQueryString(options?.params)}`;
   const headers: Record<string, string> = {};
+
+  // Auth header
+  if (!options?.skipAuth) {
+    const token = _getAccessToken?.();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   if (options?.body) {
     headers["Content-Type"] = "application/json";
   }
+
   const init: RequestInit = {
     method: options?.method || "GET",
     headers,
+    credentials: "include",
   };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
   }
-  const res = await fetch(url, init);
+
+  let res = await fetch(url, init);
+
+  // 401 → try refresh
+  if (res.status === 401 && !options?.skipAuth && _refreshAccessToken) {
+    const newToken = await _refreshAccessToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      init.headers = headers;
+      res = await fetch(url, init);
+    } else {
+      _onAuthFailure?.();
+      throw new ApiError(401, "UNAUTHORIZED", "인증이 만료되었습니다.");
+    }
+  }
+
   if (!res.ok) {
     let errorData: { error?: string; message?: string; detail?: string } = {};
     try {
@@ -100,9 +142,18 @@ async function fetchFormData<T>(
   if (metadata) {
     formData.append("metadata", JSON.stringify(metadata));
   }
+
+  const headers: Record<string, string> = {};
+  const token = _getAccessToken?.();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     body: formData,
+    headers,
+    credentials: "include",
   });
   if (!res.ok) {
     let errorData: { error?: string; message?: string; detail?: string } = {};
@@ -121,6 +172,21 @@ async function fetchFormData<T>(
 }
 
 export const api = {
+  auth: {
+    login: (email: string, password: string) =>
+      fetchJSON<{ access_token: string }>("/api/auth/login", {
+        method: "POST",
+        body: { email, password },
+        skipAuth: true,
+      }),
+    signup: (name: string, email: string, password: string) =>
+      fetchJSON<{ id: number; email: string }>("/api/auth/signup", {
+        method: "POST",
+        body: { name, email, password },
+        skipAuth: true,
+      }),
+    me: () => fetchJSON<{ id: number; email: string; name: string; role: string }>("/api/auth/me"),
+  },
   documents: {
     list: (params?: DocumentListParams) => {
       const { source, ...rest } = params ?? {};
@@ -201,7 +267,7 @@ export const api = {
   },
   system: {
     health: () =>
-      fetchJSON<HealthCheck>("/api/health"),
+      fetchJSON<HealthCheck>("/api/health", { skipAuth: true }),
     status: () =>
       fetchJSON<SystemStatus>("/api/system/status"),
     reindexAll: () =>

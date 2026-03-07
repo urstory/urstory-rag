@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.main import app
 from app.models.database import Base, get_db
+from app.dependencies import get_current_user, require_admin
 
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://admin:changeme_strong_password@localhost:5432/shared_test"
@@ -37,6 +38,8 @@ async def res_client(res_db):
         yield res_db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
+    app.dependency_overrides[require_admin] = lambda: type('User', (), {'id': 1, 'email': 'admin@test.com', 'name': 'admin', 'role': 'admin', 'is_active': True})()
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:

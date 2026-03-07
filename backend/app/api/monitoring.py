@@ -14,7 +14,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models.database import Document, DocumentStatus, Chunk, get_db
+from app.dependencies import require_admin
+from app.models.database import Document, DocumentStatus, Chunk, User, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class CostResponse(BaseModel):
 
 
 @router.get("/monitoring/stats", response_model=MonitoringStatsResponse)
-async def get_stats(db: AsyncSession = Depends(get_db)):
+async def get_stats(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """집계 통계를 반환한다."""
     # 문서 수
     doc_count_result = await db.execute(
@@ -78,7 +79,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/monitoring/traces", response_model=TraceListResponse)
-async def list_traces():
+async def list_traces(_admin: User = Depends(require_admin)):
     """Langfuse 트레이스 목록을 프록시한다."""
     traces = await _langfuse_api_get("/api/public/traces", params={"limit": 50})
     if traces is None:
@@ -89,7 +90,7 @@ async def list_traces():
 
 
 @router.get("/monitoring/traces/{trace_id}")
-async def get_trace(trace_id: str):
+async def get_trace(trace_id: str, _admin: User = Depends(require_admin)):
     """Langfuse 트레이스 상세를 프록시한다."""
     trace = await _langfuse_api_get(f"/api/public/traces/{trace_id}")
     if trace is None:
@@ -101,7 +102,7 @@ async def get_trace(trace_id: str):
 
 
 @router.get("/monitoring/costs", response_model=CostResponse)
-async def get_costs():
+async def get_costs(_admin: User = Depends(require_admin)):
     """비용 추적 정보를 반환한다."""
     # Langfuse 미연동 시 기본값
     return CostResponse(total_cost=0.0, period="today", breakdown=[])

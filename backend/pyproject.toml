@@ -32,6 +32,7 @@ dependencies = [
     "transformers>=4.47",
     "sentence-transformers>=3.3",
     "torch>=2.5",
+    "accelerate>=1.0",
     "kiwipiepy>=0.18",
     "rank-bm25>=0.2",
 

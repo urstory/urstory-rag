@@ -108,9 +108,41 @@ jobs:
 
   docker-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend-test, frontend-build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build backend Docker image
-        run: docker build -t urstory-rag-backend backend/
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tags
+        id: tags
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha_tag=${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/urstory/urstory-rag-api:latest
+            ghcr.io/urstory/urstory-rag-api:${{ steps.tags.outputs.sha_tag }}
+
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/urstory/urstory-rag-frontend:latest
+            ghcr.io/urstory/urstory-rag-frontend:${{ steps.tags.outputs.sha_tag }}

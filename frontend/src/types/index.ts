@@ -284,8 +284,16 @@ export interface SystemStatus {
   components: Record<string, boolean>;
 }
 
-/** GET /api/health 응답 */
+/** GET /api/health 응답 (Phase 13 확장) */
+export interface ComponentHealth {
+  status: "connected" | "disconnected";
+  required: boolean;
+  description: string;
+  impact: string;
+}
+
 export interface HealthCheck {
-  status: string;
-  components?: Record<string, string>;
+  status: "ok" | "degraded";
+  version: string;
+  components: Record<string, ComponentHealth>;
 }

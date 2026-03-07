@@ -68,6 +68,12 @@ dependencies = [
     # Rate Limiting
     "slowapi>=0.1.9",
 
+    # 로깅
+    "structlog>=24.1.0",
+
+    # 에러 추적
+    "sentry-sdk[fastapi]>=2.0.0",
+
     # 유틸리티
     "pydantic-settings>=2.7",
     "python-dotenv>=1.0",

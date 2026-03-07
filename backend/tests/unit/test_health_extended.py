@@ -1,5 +1,5 @@
 """Step 2.7 RED: 헬스체크 API 확장 테스트."""
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -24,15 +24,15 @@ async def test_health_all_connected():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["components"]["database"] == "connected"
-    assert data["components"]["elasticsearch"] == "connected"
-    assert data["components"]["openai"] == "connected"
-    assert data["components"]["redis"] == "connected"
+    assert data["components"]["database"]["status"] == "connected"
+    assert data["components"]["elasticsearch"]["status"] == "connected"
+    assert data["components"]["openai"]["status"] == "connected"
+    assert data["components"]["redis"]["status"] == "connected"
 
 
 @pytest.mark.asyncio
 async def test_health_db_disconnected():
-    """DB 실패 시 disconnected 표시 확인."""
+    """DB 실패 시 disconnected + degraded 표시 확인."""
     with (
         patch("app.api.health.check_db", new_callable=AsyncMock, return_value=False),
         patch("app.api.health.check_elasticsearch", new_callable=AsyncMock, return_value=True),
@@ -46,9 +46,9 @@ async def test_health_db_disconnected():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "ok"
-    assert data["components"]["database"] == "disconnected"
-    assert data["components"]["elasticsearch"] == "connected"
+    assert data["status"] == "degraded"
+    assert data["components"]["database"]["status"] == "disconnected"
+    assert data["components"]["elasticsearch"]["status"] == "connected"
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,8 @@ async def test_health_multiple_disconnected():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["components"]["database"] == "disconnected"
-    assert data["components"]["elasticsearch"] == "disconnected"
-    assert data["components"]["openai"] == "connected"
-    assert data["components"]["redis"] == "disconnected"
+    assert data["status"] == "degraded"
+    assert data["components"]["database"]["status"] == "disconnected"
+    assert data["components"]["elasticsearch"]["status"] == "disconnected"
+    assert data["components"]["openai"]["status"] == "connected"
+    assert data["components"]["redis"]["status"] == "disconnected"

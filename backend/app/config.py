@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3500"
     rate_limit_enabled: bool = True
 
+    # 로깅
+    log_level: str = "INFO"
+    log_format: str = "json"  # json | console
+
+    # Sentry
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
+    sentry_traces_sample_rate: float = 0.1
+
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     langfuse_public_key: str | None = None

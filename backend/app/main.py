@@ -199,18 +199,25 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+def _get_request_id() -> str:
+    """미들웨어가 설정한 contextvars에서 request_id를 가져온다."""
+    ctx = structlog.contextvars.get_contextvars()
+    return ctx.get("request_id", "unknown")
+
+
 @app.exception_handler(RAGException)
 async def rag_exception_handler(request: Request, exc: RAGException):
-    request_id = request.headers.get("X-Request-ID", "unknown")
+    request_id = _get_request_id()
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.error_code, "message": str(exc), "request_id": request_id},
+        headers={"X-Request-ID": request_id},
     )
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    request_id = request.headers.get("X-Request-ID", "unknown")
+    request_id = _get_request_id()
     logger.error("unhandled_exception", error=str(exc), request_id=request_id)
     return JSONResponse(
         status_code=500,
@@ -219,6 +226,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             "message": "내부 오류가 발생했습니다.",
             "request_id": request_id,
         },
+        headers={"X-Request-ID": request_id},
     )
 
 

@@ -11,4 +11,4 @@ def init_limiter() -> None:
     """Settings가 로드된 후 호출. 기존 limiter를 in-place 활성화."""
     from app.config import get_settings
     env = get_settings()
-    limiter._enabled = env.rate_limit_enabled
+    limiter.enabled = env.rate_limit_enabled

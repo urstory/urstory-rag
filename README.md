@@ -37,6 +37,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **RAGAS 자동 품질 평가** | Faithfulness, Relevancy, Context Precision 등 자동 측정 |
 | **Langfuse 모니터링** | v3 풀 스택 (Web + Worker + ClickHouse + Redis + MinIO) 통합 |
 | **관리자 UI** | Next.js 15 + React 19 + shadcn/ui 기반 대시보드 |
+| **Redis 응답 캐싱** | SHA-256 키 해싱, 설정/문서 변경 시 자동 무효화, X-Cache 헤더, 3-tier 설정 캐시 |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
 | **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |
 | **보안 헤더** | X-Content-Type-Options, X-Frame-Options, CSP 등 보안 미들웨어 |
@@ -67,7 +68,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
               v                  v                  v
      +--------+------+  +-------+-------+  +-------+-------+
      | PostgreSQL    |  | Elasticsearch |  | Redis         |
-     | + PGVector    |  | + Nori        |  | (Celery 큐)   |
+     | + PGVector    |  | + Nori        |  | (캐싱 + 큐)  |
      | (벡터 저장소) |  | (키워드 검색) |  |               |
      +---------------+  +---------------+  +---------------+
 
@@ -93,7 +94,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **프론트엔드** | Next.js + React + shadcn/ui | 15 / 19 |
 | **벡터 DB** | PostgreSQL + PGVector | PG 17 |
 | **키워드 검색** | Elasticsearch + Nori | 8.x |
-| **작업 큐** | Celery + Redis | 5.4+ / 7 |
+| **캐싱 + 작업 큐** | Redis + Celery | 7 / 5.4+ |
 | **임베딩** | OpenAI text-embedding-3-small | 1536차원 |
 | **LLM** | OpenAI gpt-4.1-mini | -- |
 | **평가 Judge** | OpenAI gpt-4o | -- |

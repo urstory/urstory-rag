@@ -1,6 +1,6 @@
 """관리자 전용 API 엔드포인트."""
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,21 +15,24 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class AdminCreateUserRequest(BaseModel):
+    username: str
     name: str
-    email: EmailStr
+    email: str | None = None
     password: str
     role: str = "user"
 
 
 class AdminUpdateUserRequest(BaseModel):
     name: str | None = None
+    email: str | None = None
     role: str | None = None
     is_active: bool | None = None
 
 
 class AdminUserResponse(BaseModel):
     id: int
-    email: str
+    username: str
+    email: str | None
     name: str
     role: str
     is_active: bool
@@ -64,9 +67,9 @@ async def create_user(
     _admin: User = Depends(require_admin),
 ):
     """관리자가 직접 사용자 생성."""
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="이미 등록된 이메일입니다.")
+        raise HTTPException(status_code=409, detail="이미 등록된 아이디입니다.")
 
     try:
         validate_password_strength(body.password)
@@ -77,6 +80,7 @@ async def create_user(
         raise HTTPException(status_code=400, detail="역할은 admin 또는 user여야 합니다.")
 
     user = User(
+        username=body.username,
         email=body.email,
         hashed_password=hash_password(body.password),
         name=body.name,
@@ -104,6 +108,8 @@ async def update_user(
 
     if body.name is not None:
         user.name = body.name
+    if body.email is not None:
+        user.email = body.email if body.email else None
     if body.role is not None:
         if body.role not in ("admin", "user"):
             raise HTTPException(status_code=400, detail="역할은 admin 또는 user여야 합니다.")
@@ -140,6 +146,7 @@ async def delete_user(
 def _user_to_dict(user: User) -> dict:
     return {
         "id": user.id,
+        "username": user.username,
         "email": user.email,
         "name": user.name,
         "role": user.role,
@@ -151,6 +158,7 @@ def _user_to_dict(user: User) -> dict:
 def _user_to_response(user: User) -> AdminUserResponse:
     return AdminUserResponse(
         id=user.id,
+        username=user.username,
         email=user.email,
         name=user.name,
         role=user.role,

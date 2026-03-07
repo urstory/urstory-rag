@@ -31,7 +31,7 @@ async def _ensure_admin_user(session):
     validate_password_strength(env.admin_password)
 
     admin_user = User(
-        email=env.admin_email,
+        username=env.admin_username,
         hashed_password=hash_password(env.admin_password),
         name="관리자",
         role="admin",
@@ -39,7 +39,7 @@ async def _ensure_admin_user(session):
     )
     session.add(admin_user)
     await session.commit()
-    logger.info("초기 관리자 계정 생성됨: %s", env.admin_email)
+    logger.info("초기 관리자 계정 생성됨: %s", env.admin_username)
 
     if env.admin_password == "ChangeMe1234!@#$":
         logger.warning("기본 관리자 비밀번호 사용 중. 즉시 변경하세요!")

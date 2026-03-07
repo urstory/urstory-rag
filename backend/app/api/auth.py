@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,13 +28,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class SignupRequest(BaseModel):
+    username: str
     name: str
-    email: EmailStr
+    email: str | None = None
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -45,10 +46,26 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    email: str
+    username: str
+    email: str | None
     name: str
     role: str
     is_active: bool
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_empty(cls, v: str | None) -> str | None:
+        if v is not None:
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("이름은 비어있을 수 없습니다.")
+            return stripped
+        return v
 
 
 class PasswordChangeRequest(BaseModel):
@@ -71,9 +88,9 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
         )
 
     # 중복 확인
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="이미 등록된 이메일입니다.")
+        raise HTTPException(status_code=409, detail="이미 등록된 아이디입니다.")
 
     try:
         validate_password_strength(body.password)
@@ -81,6 +98,7 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
         raise HTTPException(status_code=422, detail=str(e))
 
     user = User(
+        username=body.username,
         email=body.email,
         hashed_password=hash_password(body.password),
         name=body.name,
@@ -92,7 +110,7 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
     await db.refresh(user)
 
     return UserResponse(
-        id=user.id, email=user.email, name=user.name,
+        id=user.id, username=user.username, email=user.email, name=user.name,
         role=user.role, is_active=user.is_active,
     )
 
@@ -101,11 +119,11 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     """로그인 → access_token (body) + refresh_token (HttpOnly Cookie)."""
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="비활성화된 계정입니다.")
@@ -207,7 +225,27 @@ async def logout(
 async def get_me(user: User = Depends(get_current_user)):
     """현재 사용자 정보."""
     return UserResponse(
-        id=user.id, email=user.email, name=user.name,
+        id=user.id, username=user.username, email=user.email, name=user.name,
+        role=user.role, is_active=user.is_active,
+    )
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_profile(
+    body: ProfileUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로필(이름, 이메일) 변경."""
+    if body.name is not None:
+        user.name = body.name
+    if body.email is not None:
+        user.email = body.email if body.email else None
+    await db.commit()
+    await db.refresh(user)
+
+    return UserResponse(
+        id=user.id, username=user.username, email=user.email, name=user.name,
         role=user.role, is_active=user.is_active,
     )
 

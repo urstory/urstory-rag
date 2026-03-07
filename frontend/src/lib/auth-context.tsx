@@ -4,7 +4,8 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 
 interface User {
   id: number;
-  email: string;
+  username: string;
+  email: string | null;
   name: string;
   role: string;
   is_active: boolean;
@@ -15,9 +16,10 @@ interface AuthContextType {
   accessToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<string | null>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -66,11 +68,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, [refreshAccessToken, fetchMe]);
 
-  const login = async (email: string, password: string) => {
+  const refreshUser = useCallback(async () => {
+    if (accessToken) {
+      const me = await fetchMe(accessToken);
+      if (me) setUser(me);
+    }
+  }, [accessToken, fetchMe]);
+
+  const login = async (username: string, password: string) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       credentials: "include",
     });
     if (!res.ok) {
@@ -107,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refreshAccessToken,
+        refreshUser,
       }}
     >
       {children}

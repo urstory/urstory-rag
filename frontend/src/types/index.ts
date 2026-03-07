@@ -21,6 +21,18 @@ export interface PaginationParams {
   order?: "asc" | "desc";
 }
 
+// ========== Admin / Users ==========
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string | null;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string | null;
+}
+
 // ========== Documents ==========
 
 export interface Document {

@@ -24,6 +24,7 @@ import type {
   CostEntry,
   SystemStatus,
   HealthCheck,
+  AdminUser,
 } from "@/types";
 
 const API_BASE = "";
@@ -173,19 +174,39 @@ async function fetchFormData<T>(
 
 export const api = {
   auth: {
-    login: (email: string, password: string) =>
+    login: (username: string, password: string) =>
       fetchJSON<{ access_token: string }>("/api/auth/login", {
         method: "POST",
-        body: { email, password },
+        body: { username, password },
         skipAuth: true,
       }),
-    signup: (name: string, email: string, password: string) =>
-      fetchJSON<{ id: number; email: string }>("/api/auth/signup", {
+    signup: (username: string, name: string, password: string, email?: string) =>
+      fetchJSON<{ id: number; username: string }>("/api/auth/signup", {
         method: "POST",
-        body: { name, email, password },
+        body: { username, name, password, email },
         skipAuth: true,
       }),
-    me: () => fetchJSON<{ id: number; email: string; name: string; role: string }>("/api/auth/me"),
+    me: () => fetchJSON<{ id: number; username: string; email: string | null; name: string; role: string }>("/api/auth/me"),
+    updateProfile: (data: { name?: string; email?: string }) =>
+      fetchJSON<{ id: number; username: string; email: string | null; name: string; role: string; is_active: boolean }>("/api/auth/me", {
+        method: "PUT",
+        body: data,
+      }),
+    changePassword: (data: { current_password: string; new_password: string }) =>
+      fetchJSON<{ message: string }>("/api/auth/me/password", {
+        method: "PUT",
+        body: data,
+      }),
+  },
+  admin: {
+    listUsers: () =>
+      fetchJSON<{ items: AdminUser[]; total: number }>("/api/admin/users"),
+    createUser: (data: { username: string; name: string; password: string; role: string; email?: string }) =>
+      fetchJSON<AdminUser>("/api/admin/users", { method: "POST", body: data }),
+    updateUser: (id: number, data: { name?: string; email?: string; role?: string; is_active?: boolean }) =>
+      fetchJSON<AdminUser>(`/api/admin/users/${id}`, { method: "PUT", body: data }),
+    deleteUser: (id: number) =>
+      fetchJSON<{ message: string; id: number }>(`/api/admin/users/${id}`, { method: "DELETE" }),
   },
   documents: {
     list: (params?: DocumentListParams) => {

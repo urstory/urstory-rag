@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # 인증
     jwt_secret_key: str = ""
-    admin_email: str = "admin@example.com"
+    admin_username: str = "admin"
     admin_password: str = "ChangeMe1234!@#$"
     allow_public_signup: bool = False
     cors_origins: str = "http://localhost:3500"

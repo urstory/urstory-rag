@@ -30,8 +30,9 @@ def _auth_env(monkeypatch):
 
 class _FakeUser:
     """테스트용 가짜 User 객체 (SQLAlchemy 모델 인스턴스가 아닌 POPO)."""
-    def __init__(self, id, email, name, role, is_active=True):
+    def __init__(self, id, username, name, role, email=None, is_active=True):
         self.id = id
+        self.username = username
         self.email = email
         self.name = name
         self.role = role
@@ -39,8 +40,8 @@ class _FakeUser:
         self.hashed_password = ""
 
 
-_admin_user = _FakeUser(id=1, email="admin@test.com", name="테스트 관리자", role="admin")
-_regular_user = _FakeUser(id=2, email="user@test.com", name="테스트 사용자", role="user")
+_admin_user = _FakeUser(id=1, username="testadmin", name="테스트 관리자", role="admin", email="admin@test.com")
+_regular_user = _FakeUser(id=2, username="testuser", name="테스트 사용자", role="user")
 
 
 @pytest_asyncio.fixture

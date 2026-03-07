@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(username, password);
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
@@ -40,12 +40,12 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Input
-                type="email"
-                placeholder="이메일"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="아이디"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
             <div>

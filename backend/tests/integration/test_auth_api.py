@@ -59,6 +59,7 @@ async def client(test_db):
 async def admin_user(test_db):
     """테스트용 관리자 사용자 생성."""
     user = User(
+        username="testadmin",
         email="admin@test.com",
         hashed_password=hash_password("AdminPass123!@#"),
         name="테스트 관리자",
@@ -75,7 +76,7 @@ async def admin_user(test_db):
 async def regular_user(test_db):
     """테스트용 일반 사용자 생성."""
     user = User(
-        email="user@test.com",
+        username="testuser",
         hashed_password=hash_password("UserPass123!@#$"),
         name="테스트 사용자",
         role="user",
@@ -87,9 +88,9 @@ async def regular_user(test_db):
     return user
 
 
-async def _login(client, email, password):
+async def _login(client, username, password):
     """로그인 헬퍼."""
-    resp = await client.post("/api/auth/login", json={"email": email, "password": password})
+    resp = await client.post("/api/auth/login", json={"username": username, "password": password})
     return resp
 
 
@@ -108,7 +109,7 @@ def mock_redis():
 
 class TestLogin:
     async def test_login_success(self, client, admin_user):
-        resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        resp = await _login(client, "testadmin", "AdminPass123!@#")
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
@@ -117,16 +118,16 @@ class TestLogin:
         assert "refresh_token" in resp.cookies
 
     async def test_login_wrong_password(self, client, admin_user):
-        resp = await _login(client, "admin@test.com", "WrongPassword1!@#")
+        resp = await _login(client, "testadmin", "WrongPassword1!@#")
         assert resp.status_code == 401
 
     async def test_login_nonexistent_user(self, client):
-        resp = await _login(client, "nobody@test.com", "SomePass123!@#$")
+        resp = await _login(client, "nobody", "SomePass123!@#$")
         assert resp.status_code == 401
 
     async def test_login_inactive_user(self, client, test_db):
         user = User(
-            email="inactive@test.com",
+            username="inactiveuser",
             hashed_password=hash_password("InactivePass123!@#"),
             name="비활성 사용자",
             role="user",
@@ -135,7 +136,7 @@ class TestLogin:
         test_db.add(user)
         await test_db.commit()
 
-        resp = await _login(client, "inactive@test.com", "InactivePass123!@#")
+        resp = await _login(client, "inactiveuser", "InactivePass123!@#")
         assert resp.status_code == 403
 
 
@@ -143,8 +144,8 @@ class TestSignup:
     async def test_signup_blocked_by_default(self, client):
         """ALLOW_PUBLIC_SIGNUP=false일 때 회원가입 차단."""
         resp = await client.post("/api/auth/signup", json={
+            "username": "newuser",
             "name": "새 사용자",
-            "email": "new@test.com",
             "password": "NewPassword123!@#",
         })
         assert resp.status_code == 403
@@ -156,14 +157,30 @@ class TestSignup:
         get_settings.cache_clear()
 
         resp = await client.post("/api/auth/signup", json={
+            "username": "newuser",
             "name": "새 사용자",
             "email": "new@test.com",
             "password": "NewPassword123!@#",
         })
         assert resp.status_code == 201
         data = resp.json()
+        assert data["username"] == "newuser"
         assert data["email"] == "new@test.com"
         assert data["role"] == "user"
+
+    async def test_signup_without_email(self, client, monkeypatch):
+        """이메일 없이 회원가입 가능."""
+        monkeypatch.setenv("ALLOW_PUBLIC_SIGNUP", "true")
+        from app.config import get_settings
+        get_settings.cache_clear()
+
+        resp = await client.post("/api/auth/signup", json={
+            "username": "noemail",
+            "name": "이메일 없는 사용자",
+            "password": "NewPassword123!@#",
+        })
+        assert resp.status_code == 201
+        assert resp.json()["email"] is None
 
     async def test_signup_weak_password(self, client, monkeypatch):
         monkeypatch.setenv("ALLOW_PUBLIC_SIGNUP", "true")
@@ -171,20 +188,20 @@ class TestSignup:
         get_settings.cache_clear()
 
         resp = await client.post("/api/auth/signup", json={
+            "username": "weakpw",
             "name": "약한 비밀번호",
-            "email": "weak@test.com",
             "password": "short",
         })
         assert resp.status_code == 422 or resp.status_code == 500
 
-    async def test_signup_duplicate_email(self, client, admin_user, monkeypatch):
+    async def test_signup_duplicate_username(self, client, admin_user, monkeypatch):
         monkeypatch.setenv("ALLOW_PUBLIC_SIGNUP", "true")
         from app.config import get_settings
         get_settings.cache_clear()
 
         resp = await client.post("/api/auth/signup", json={
+            "username": "testadmin",
             "name": "중복",
-            "email": "admin@test.com",
             "password": "DuplicatePass123!@#",
         })
         assert resp.status_code == 409
@@ -192,17 +209,62 @@ class TestSignup:
 
 class TestAuthMe:
     async def test_get_me(self, client, admin_user):
-        login_resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
         token = login_resp.json()["access_token"]
 
         resp = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["email"] == "admin@test.com"
+        assert data["username"] == "testadmin"
         assert data["role"] == "admin"
 
     async def test_get_me_no_token(self, client):
         resp = await client.get("/api/auth/me")
+        assert resp.status_code == 401
+
+
+class TestUpdateProfile:
+    async def test_update_name(self, client, admin_user):
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
+        token = login_resp.json()["access_token"]
+
+        resp = await client.put(
+            "/api/auth/me",
+            json={"name": "변경된 이름"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "변경된 이름"
+
+        # GET /me로도 반영 확인
+        me = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.json()["name"] == "변경된 이름"
+
+    async def test_update_email(self, client, admin_user):
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
+        token = login_resp.json()["access_token"]
+
+        resp = await client.put(
+            "/api/auth/me",
+            json={"email": "newemail@test.com"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["email"] == "newemail@test.com"
+
+    async def test_update_name_empty(self, client, admin_user):
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
+        token = login_resp.json()["access_token"]
+
+        resp = await client.put(
+            "/api/auth/me",
+            json={"name": ""},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_update_no_auth(self, client):
+        resp = await client.put("/api/auth/me", json={"name": "이름"})
         assert resp.status_code == 401
 
 
@@ -213,7 +275,7 @@ class TestProtectedEndpoints:
         assert resp.status_code == 401 or resp.status_code == 403
 
     async def test_documents_requires_admin(self, client, regular_user):
-        login_resp = await _login(client, "user@test.com", "UserPass123!@#$")
+        login_resp = await _login(client, "testuser", "UserPass123!@#$")
         token = login_resp.json()["access_token"]
 
         resp = await client.get("/api/documents", headers={"Authorization": f"Bearer {token}"})
@@ -236,7 +298,7 @@ class TestSecurityHeaders:
 
 class TestAdminAPI:
     async def test_admin_list_users(self, client, admin_user):
-        login_resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
         token = login_resp.json()["access_token"]
 
         resp = await client.get("/api/admin/users", headers={"Authorization": f"Bearer {token}"})
@@ -244,27 +306,28 @@ class TestAdminAPI:
         assert resp.json()["total"] >= 1
 
     async def test_admin_create_user(self, client, admin_user):
-        login_resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
         token = login_resp.json()["access_token"]
 
         resp = await client.post("/api/admin/users", json={
+            "username": "createduser",
             "name": "관리자가 만든 사용자",
             "email": "created@test.com",
             "password": "CreatedPass123!@#",
             "role": "user",
         }, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 201
-        assert resp.json()["email"] == "created@test.com"
+        assert resp.json()["username"] == "createduser"
 
     async def test_non_admin_cannot_access(self, client, regular_user):
-        login_resp = await _login(client, "user@test.com", "UserPass123!@#$")
+        login_resp = await _login(client, "testuser", "UserPass123!@#$")
         token = login_resp.json()["access_token"]
 
         resp = await client.get("/api/admin/users", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403
 
     async def test_admin_delete_user(self, client, admin_user, regular_user):
-        login_resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
         token = login_resp.json()["access_token"]
 
         resp = await client.delete(
@@ -274,7 +337,7 @@ class TestAdminAPI:
         assert resp.status_code == 200
 
     async def test_admin_cannot_delete_self(self, client, admin_user):
-        login_resp = await _login(client, "admin@test.com", "AdminPass123!@#")
+        login_resp = await _login(client, "testadmin", "AdminPass123!@#")
         token = login_resp.json()["access_token"]
 
         resp = await client.delete(

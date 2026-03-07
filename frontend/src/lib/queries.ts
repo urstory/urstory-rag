@@ -26,6 +26,7 @@ import type {
   Trace,
   CostEntry,
   AvailableModels,
+  AdminUser,
 } from "@/types";
 
 // ========== Documents ==========
@@ -249,6 +250,66 @@ export function useCosts(params?: { start_date?: string; end_date?: string }) {
   return useQuery<CostEntry>({
     queryKey: ["monitoring", "costs", params],
     queryFn: () => api.monitoring.costs(params),
+  });
+}
+
+// ========== Auth / Profile ==========
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; email?: string }) => api.auth.updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: { current_password: string; new_password: string }) =>
+      api.auth.changePassword(data),
+  });
+}
+
+// ========== Admin Users ==========
+
+export function useAdminUsers() {
+  return useQuery<{ items: AdminUser[]; total: number }>({
+    queryKey: ["admin", "users"],
+    queryFn: () => api.admin.listUsers(),
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { username: string; name: string; password: string; role: string; email?: string }) =>
+      api.admin.createUser(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; name?: string; email?: string; role?: string; is_active?: boolean }) =>
+      api.admin.updateUser(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.admin.deleteUser(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
   });
 }
 

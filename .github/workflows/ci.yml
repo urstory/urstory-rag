@@ -94,6 +94,8 @@ jobs:
           node-version: "22"
 
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

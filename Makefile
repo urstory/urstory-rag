@@ -41,6 +41,7 @@ help: ## 사용 가능한 명령어 목록 출력
 	@echo "    백엔드 API     http://localhost:8000"
 	@echo "    Swagger UI     http://localhost:8000/docs"
 	@echo "    프론트엔드     http://localhost:3500"
+	@echo "    Langfuse       http://localhost:3100"
 	@echo ""
 
 # 초기 설정

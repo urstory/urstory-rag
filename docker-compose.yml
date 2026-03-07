@@ -27,7 +27,7 @@ services:
     ports:
       - "3100:3000"
     environment: &langfuse-env
-      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme_strong_password}@shared-postgres:5432/${POSTGRES_DB:-shared}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme_strong_password}@shared-postgres:5432/langfuse
       NEXTAUTH_URL: http://localhost:3100
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-changeme_nextauth_secret}
       SALT: ${SALT:-changeme_salt_string}
@@ -36,7 +36,7 @@ services:
       CLICKHOUSE_URL: http://rag-clickhouse:8123
       CLICKHOUSE_MIGRATION_URL: clickhouse://rag-clickhouse:9000
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
       # Redis (Langfuse 전용)
       REDIS_HOST: langfuse-redis
       REDIS_PORT: 6379
@@ -80,9 +80,10 @@ services:
     container_name: rag-clickhouse
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/keeper-config.xml:/etc/clickhouse-server/config.d/keeper-config.xml:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
       interval: 5s
@@ -118,6 +119,25 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+  langfuse-minio-init:
+    image: minio/mc:latest
+    container_name: langfuse-minio-init
+    depends_on:
+      langfuse-minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://langfuse-minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing minio/langfuse &&
+      echo 'Bucket langfuse ready'
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      - default
+    restart: "no"
 
 volumes:
   clickhouse_data:

@@ -2,6 +2,3 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- RAG 시스템용 스키마
 CREATE SCHEMA IF NOT EXISTS rag;
-
--- Langfuse용 스키마
-CREATE SCHEMA IF NOT EXISTS langfuse;

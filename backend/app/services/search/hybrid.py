@@ -452,7 +452,7 @@ class HybridSearchOrchestrator:
             self._lf_end(lf_span, {"grounded_ratio": hal_result.grounded_ratio})
             if hal_result.grounded_ratio is not None and lf_trace:
                 self.langfuse.score(
-                    getattr(lf_trace, "id", ""), "hallucination", hal_result.grounded_ratio,
+                    getattr(lf_trace, "trace_id", ""), "hallucination", hal_result.grounded_ratio,
                 )
             if not passed:
                 answer = self.hallucination_detector.handle_result(
@@ -462,6 +462,7 @@ class HybridSearchOrchestrator:
         # 트레이스 완료
         if lf_trace:
             lf_trace.update(output=answer)
+            lf_trace.end()
 
         return SearchPipelineResult(
             documents=documents,
@@ -486,7 +487,9 @@ class HybridSearchOrchestrator:
     @staticmethod
     def _lf_end(obj, output=None):
         if obj is not None:
-            obj.end(output=output)
+            if output is not None:
+                obj.update(output=output)
+            obj.end()
 
     # ------------------------------------------------------------------
     # 내부 검색 메서드

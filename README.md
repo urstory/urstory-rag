@@ -192,12 +192,28 @@ pnpm dev
 
 ### Step 6: Langfuse 모니터링 (선택)
 
-프로젝트 루트에서 앱 docker-compose를 실행하면 Langfuse v3 풀 스택이 함께 올라간다.
+프로젝트 루트에서 Langfuse v3 풀 스택을 실행한다.
 
 ```bash
 # 프로젝트 루트에서
-docker compose up -d langfuse-web langfuse-worker rag-clickhouse langfuse-redis langfuse-minio
+docker compose up -d
 ```
+
+Langfuse 초기 설정:
+
+1. http://localhost:3100 에 접속하여 계정을 생성한다 (Sign Up).
+2. Organization과 Project를 생성한다.
+3. Project Settings > API Keys에서 API 키를 발급받는다.
+4. 발급받은 키를 `.env`와 `backend/.env`에 설정한다:
+
+```dotenv
+LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxx
+LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxx
+```
+
+5. 백엔드를 재시작하면 검색 파이프라인의 트레이싱이 자동으로 시작된다.
+
+> Langfuse 키가 설정되지 않아도 RAG 파이프라인은 정상 동작한다 (no-op 모드).
 
 ### Step 7: 접속 확인
 

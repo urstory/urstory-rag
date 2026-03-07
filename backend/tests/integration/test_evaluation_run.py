@@ -162,8 +162,12 @@ class TestMonitoringIntegration:
         assert data["total_chunks"] == 45
 
     @pytest.mark.asyncio
-    async def test_monitoring_traces_without_langfuse(self, integ_client):
+    async def test_monitoring_traces_without_langfuse(self, integ_client, monkeypatch):
         """Langfuse 미설정 시 빈 트레이스 목록."""
+        monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "")
+        monkeypatch.setenv("LANGFUSE_SECRET_KEY", "")
+        from app.config import get_settings
+        get_settings.cache_clear()
         resp = await integ_client.get("/api/monitoring/traces")
         assert resp.status_code == 200
         assert resp.json()["items"] == []

@@ -20,7 +20,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 - **관리자 UI에서 모든 기능 ON/OFF 제어**: 리랭킹, HyDE, 가드레일, 검색 전략 등을 코드 변경 없이 관리자 UI에서 실시간 토글할 수 있다.
 - **자동 품질 평가**: RAGAS + LLM-as-Judge로 검색/생성 품질을 자동 측정하고, Langfuse로 전체 파이프라인을 모니터링한다.
 
-공개 테스트 데이터셋(68개 Q&A, 10개 공공 문서)에서 **LLM Judge 평균 90.3점, GOOD 비율 95.2%**를 달성했다.
+공개 테스트 데이터셋(68개 Q&A, 10개 공공 문서)에서 **LLM Judge 평균 92.0점, GOOD 비율 96%, 검색 적중률 100%**를 달성했다.
 
 ---
 
@@ -39,6 +39,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **관리자 UI** | Next.js 15 + React 19 + shadcn/ui 기반 대시보드 |
 | **Circuit Breaker + 재시도** | OpenAI/ES 호출 시 Exponential Backoff 재시도(3회) + Circuit Breaker(연속 5회 실패 시 30초 차단). 리랭킹/HyDE 실패 시 Graceful Degradation |
 | **Redis 응답 캐싱** | SHA-256 키 해싱, 설정/문서 변경 시 자동 무효화, X-Cache 헤더, 3-tier 설정 캐시 |
+| **🔥 Docling PDF 레이아웃 인식** | IBM Docling 기반 PDF 구조 분석 -- 테이블 마크다운 추출, 다단 컬럼 정렬, 정확한 헤더 감지. pypdf 대비 테이블 정확도 0%→90%+. 실패 시 pypdf 자동 폴백 |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
 | **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |
 | **보안 헤더** | X-Content-Type-Options, X-Frame-Options, CSP 등 보안 미들웨어 |
@@ -100,6 +101,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **LLM** | OpenAI gpt-4.1-mini | -- |
 | **평가 Judge** | OpenAI gpt-4o | -- |
 | **리랭커** | dragonkue/bge-reranker-v2-m3-ko | -- |
+| **PDF 파서** | IBM Docling (레이아웃 인식 + TableFormer) | 2.78+ |
 | **NLP** | kiwipiepy (한국어 형태소 분석) | 0.18+ |
 | **모니터링** | Langfuse v3 | 3.x |
 | **품질 평가** | RAGAS | 0.2+ |
@@ -322,16 +324,19 @@ cd backend
 | LLM-as-Judge (GPT-4o) | 메인 지표 | 의미적 정확도를 0~100점으로 판정 |
 | 키워드 재현율 | 보조 지표 | 숫자/고유명사 exact match |
 
-### 품질 테스트 결과 (2026-03-07)
+### 품질 테스트 결과 (2026-03-11, Docling 적용)
 
-공개 데이터셋 68개 Q&A, 10개 문서(2,239 청크) 기준:
+공개 데이터셋 68개 Q&A, 12개 문서 기준:
 
-| 지표 | 결과 |
-|------|------|
-| LLM Judge 평균 점수 | **90.3 / 100** |
-| GOOD (70점 이상) | **60 / 63 (95.2%)** |
-| FAIL (40점 미만) | 3 / 63 (4.8%) |
-| 키워드 재현율 | 60.8% |
+| 지표 | 이전 (pypdf) | **현재 (Docling)** |
+|------|:---:|:---:|
+| LLM Judge 평균 점수 | 90.3 / 100 | **92.0 / 100** |
+| GOOD (70점 이상) | 60 / 63 (95.2%) | **65 / 68 (96%)** |
+| FAIL (40점 미만) | 3 / 63 (4.8%) | **2 / 68 (3%)** |
+| 키워드 재현율 | 60.8% | **67.7%** |
+| 검색 적중률 (score>0.3) | -- | **68/68 (100%)** |
+
+> Docling 도입으로 PDF 테이블 구조 보존, 정확한 헤더 감지, 다단 컬럼 정렬이 개선되어 전체 품질이 향상되었다.
 
 상세 분석은 [`docs/rag_quality_test_report_public_20260307.md`](docs/rag_quality_test_report_public_20260307.md) 참조.
 

@@ -346,10 +346,35 @@ def call_with_retry(client, question, max_retries=3, base_delay=3.0):
 REQUEST_DELAY = 0.5
 
 
+def get_auth_headers() -> dict:
+    """API 인증 토큰을 획득한다."""
+    login_client = httpx.Client(timeout=10.0)
+    # 환경변수 또는 기본 관리자 계정
+    username = os.environ.get("ADMIN_USERNAME", "admin")
+    password = os.environ.get("ADMIN_PASSWORD", "ChangeMe1234!@#$")
+    try:
+        resp = login_client.post(
+            f"{API_URL}/api/auth/login",
+            json={"username": username, "password": password},
+        )
+        resp.raise_for_status()
+        token = resp.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+    except Exception as e:
+        print(f"  인증 실패 (공개 API로 시도): {e}")
+        return {}
+
+
 def main():
     client = httpx.Client(timeout=120.0)
     judge_client = httpx.Client(timeout=30.0)
     base = os.path.dirname(os.path.abspath(__file__))
+
+    # 인증 토큰 획득
+    auth_headers = get_auth_headers()
+    if auth_headers:
+        print("  인증: Bearer 토큰 획득 완료")
+    client.headers.update(auth_headers)
 
     use_judge = bool(OPENAI_API_KEY)
     if not use_judge:

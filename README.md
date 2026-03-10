@@ -37,6 +37,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **RAGAS 자동 품질 평가** | Faithfulness, Relevancy, Context Precision 등 자동 측정 |
 | **Langfuse 모니터링** | v3 풀 스택 (Web + Worker + ClickHouse + Redis + MinIO) 통합 |
 | **관리자 UI** | Next.js 15 + React 19 + shadcn/ui 기반 대시보드 |
+| **Circuit Breaker + 재시도** | OpenAI/ES 호출 시 Exponential Backoff 재시도(3회) + Circuit Breaker(연속 5회 실패 시 30초 차단). 리랭킹/HyDE 실패 시 Graceful Degradation |
 | **Redis 응답 캐싱** | SHA-256 키 해싱, 설정/문서 변경 시 자동 무효화, X-Cache 헤더, 3-tier 설정 캐시 |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
 | **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |

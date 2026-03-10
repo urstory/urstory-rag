@@ -64,6 +64,7 @@
 - **Q&A 데이터셋**: `test_files/q_a.txt` (PDF 30개), `test_files/q_a2.txt` (MD 30개)
 
 ## 개발 프로세스
+- **이슈 완료 시 README.md 반영 필수**: 이슈를 처리하고 머지한 후 반드시 `README.md`의 주요 기능 테이블에 해당 기능을 추가/수정한다
 - **백엔드**: TDD (RED → GREEN → REFACTOR)
 - **프론트엔드**: 모바일 + PC만 지원 (태블릿 별도 대응 없음)
 - **E2E 테스트**: `fullstackfamily-platform-playwright:latest` Docker 이미지 사용

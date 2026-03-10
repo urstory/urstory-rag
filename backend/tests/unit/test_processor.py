@@ -84,3 +84,43 @@ class TestDocumentProcessor:
                 chunking_strategy=strategy_name,
             )
             assert processor.chunking_strategy == strategy_name
+
+
+# --- Phase 15: Processor PDF 설정 전달 테스트 ---
+
+
+class TestDocumentProcessorPDFSettings:
+    """Processor의 PDF 설정 전달 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_processor_converter_has_pdf_parser(self):
+        """Processor에 전달된 Converter가 pdf_parser 설정을 갖는다."""
+        from app.services.document.converter import DocumentConverter
+
+        converter = DocumentConverter(pdf_parser="docling", ocr_enabled=True)
+        indexer = AsyncMock()
+        db_session = AsyncMock()
+
+        processor = DocumentProcessor(
+            converter=converter,
+            indexer=indexer,
+            db_session=db_session,
+        )
+        assert processor.converter.pdf_parser == "docling"
+        assert processor.converter.ocr_enabled is True
+
+    @pytest.mark.asyncio
+    async def test_processor_converter_pypdf_mode(self):
+        """pdf_parser=pypdf 모드에서 Converter가 pypdf를 사용."""
+        from app.services.document.converter import DocumentConverter
+
+        converter = DocumentConverter(pdf_parser="pypdf")
+        indexer = AsyncMock()
+        db_session = AsyncMock()
+
+        processor = DocumentProcessor(
+            converter=converter,
+            indexer=indexer,
+            db_session=db_session,
+        )
+        assert processor.converter.pdf_parser == "pypdf"

@@ -221,3 +221,33 @@ def test_multi_query_settings_custom():
     assert rag.multi_query_count == 6
     assert rag.exact_citation_enabled is False
     assert rag.numeric_verification_enabled is False
+
+
+# --- Phase 15: Docling PDF 파서 설정 ---
+
+
+def test_docling_pdf_parser_defaults():
+    """Phase 15 PDF 파서 설정 기본값 검증."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings()
+    assert rag.pdf_parser == "docling"
+    assert rag.ocr_enabled is False
+    assert rag.ocr_languages == ["ko", "en"]
+    assert rag.table_extraction_enabled is True
+
+
+def test_docling_pdf_parser_custom():
+    """Phase 15 PDF 파서 설정 커스텀 값."""
+    from app.config import RAGSettings
+
+    rag = RAGSettings(
+        pdf_parser="pypdf",
+        ocr_enabled=True,
+        ocr_languages=["ko", "en", "ja"],
+        table_extraction_enabled=False,
+    )
+    assert rag.pdf_parser == "pypdf"
+    assert rag.ocr_enabled is True
+    assert rag.ocr_languages == ["ko", "en", "ja"]
+    assert rag.table_extraction_enabled is False

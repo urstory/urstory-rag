@@ -56,6 +56,7 @@ dependencies = [
     "python-docx>=1.1",
     "markdown-it-py>=3.0",
     "mdit_plain>=1.0",
+    "docling>=2.78",
 
     # 디렉토리 감시
     "watchdog>=6.0",

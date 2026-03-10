@@ -179,6 +179,12 @@ class RAGSettings(BaseModel):
             else:
                 object.__setattr__(self, flat, sub.enabled)
 
+    # PDF 파서 (Phase 15: Docling)
+    pdf_parser: str = "docling"  # docling | pypdf
+    ocr_enabled: bool = False
+    ocr_languages: list[str] = ["ko", "en"]
+    table_extraction_enabled: bool = True
+
     # 캐싱
     cache_enabled: bool = True
     cache_search_ttl: int = 3600  # 검색 캐시 TTL (초)

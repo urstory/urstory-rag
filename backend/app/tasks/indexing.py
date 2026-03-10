@@ -51,7 +51,12 @@ async def create_processor():
     # 임베딩: OpenAI (설정에서 모델명 로드)
     from app.services.embedding.openai import OpenAIEmbedding
     embedding = OpenAIEmbedding(api_key=settings.openai_api_key, model=rag_settings.embedding_model, dimensions=1536)
-    converter = DocumentConverter()
+    converter = DocumentConverter(
+        pdf_parser=rag_settings.pdf_parser,
+        ocr_enabled=rag_settings.ocr_enabled,
+        ocr_languages=rag_settings.ocr_languages,
+        table_extraction_enabled=rag_settings.table_extraction_enabled,
+    )
 
     from app.services.document.stores.pgvector_store import PgVectorStore
     from app.services.document.stores.elasticsearch_store import ElasticsearchStore

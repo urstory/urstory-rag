@@ -30,6 +30,18 @@ _CONVERTERS = {
 class DocumentConverter:
     """지원 형식(PDF, DOCX, TXT, MD)의 파일을 텍스트로 변환."""
 
+    def __init__(
+        self,
+        pdf_parser: str = "docling",
+        ocr_enabled: bool = False,
+        ocr_languages: list[str] | None = None,
+        table_extraction_enabled: bool = True,
+    ):
+        self.pdf_parser = pdf_parser
+        self.ocr_enabled = ocr_enabled
+        self.ocr_languages = ocr_languages or ["ko", "en"]
+        self.table_extraction_enabled = table_extraction_enabled
+
     def detect_file_type(self, filename: str) -> str:
         ext = Path(filename).suffix.lower().lstrip(".")
         return ext
@@ -46,6 +58,10 @@ class DocumentConverter:
         file_type = ext.lstrip(".")
         file_size = path.stat().st_size
 
+        # Docling으로 PDF/DOCX 변환
+        if file_type in ("pdf", "docx") and self.pdf_parser == "docling":
+            return await self._convert_with_docling(path, file_type, file_size)
+
         content = await self._extract_content(path, file_type)
 
         return ConversionResult(
@@ -56,6 +72,19 @@ class DocumentConverter:
                 "file_size": file_size,
             },
         )
+
+    async def _convert_with_docling(
+        self, path: Path, file_type: str, file_size: int
+    ) -> ConversionResult:
+        """Docling을 사용한 PDF/DOCX 변환."""
+        from app.services.document.docling_converter import DoclingPDFConverter
+
+        docling = DoclingPDFConverter(
+            ocr_enabled=self.ocr_enabled,
+            ocr_languages=self.ocr_languages,
+            table_extraction_enabled=self.table_extraction_enabled,
+        )
+        return await docling.convert(str(path))
 
     async def _extract_content(self, path: Path, file_type: str) -> str:
         if file_type == "docx":

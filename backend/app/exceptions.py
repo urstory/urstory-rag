@@ -25,3 +25,8 @@ class SearchServiceError(RAGException):
 class GuardrailViolation(RAGException):
     status_code = 400
     error_code = "GUARDRAIL_VIOLATION"
+
+
+class CircuitBreakerOpenError(RAGException):
+    status_code = 503
+    error_code = "CIRCUIT_BREAKER_OPEN"

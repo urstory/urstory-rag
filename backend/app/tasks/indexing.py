@@ -1,7 +1,10 @@
-"""문서 인덱싱 비동기 태스크."""
+"""문서 인덱싱 비동기 태스크 (강화된 재시도 로직)."""
 import asyncio
+import logging
 
 from app.worker import celery_app
+
+logger = logging.getLogger(__name__)
 
 
 async def get_document_file_path(doc_id: str) -> str:
@@ -87,10 +90,27 @@ async def _run_indexing(doc_id: str):
     await processor.process(doc_id, file_path)
 
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(
+    bind=True,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=60,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def index_document_task(self, doc_id: str):
-    """문서 인덱싱 비동기 태스크."""
+    """문서 인덱싱 비동기 태스크.
+
+    재시도 전략:
+    - 최대 5회 재시도 (기존 3회에서 강화)
+    - Exponential Backoff: 60초 → 120초 → 240초 → 480초 → 600초(max)
+    - jitter 추가 (thundering herd 방지)
+    """
     try:
         asyncio.run(_run_indexing(doc_id))
     except Exception as exc:
-        self.retry(exc=exc, countdown=60)
+        logger.error(
+            "문서 인덱싱 실패 (재시도 %d/%d) — doc_id=%s, error=%s",
+            self.request.retries, self.max_retries, doc_id, str(exc)[:200],
+        )
+        raise

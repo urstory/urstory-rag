@@ -85,9 +85,13 @@ async def health_check():
 
     required_ok = db_ok and es_ok and redis_ok
 
+    # Circuit Breaker 상태 수집
+    circuit_breakers = _collect_circuit_breaker_stats()
+
     return {
         "status": "ok" if required_ok else "degraded",
         "version": _get_version(),
+        "circuit_breakers": circuit_breakers,
         "components": {
             "database": {
                 "status": "connected" if db_ok else "disconnected",
@@ -115,6 +119,25 @@ async def health_check():
             },
         },
     }
+
+
+def _collect_circuit_breaker_stats() -> list[dict]:
+    """앱에 등록된 Circuit Breaker 상태를 수집한다."""
+    stats = []
+    try:
+        from app.main import app as main_app
+        orchestrator = getattr(main_app.state, "search_orchestrator", None)
+        if orchestrator is None:
+            return stats
+        embedder = getattr(orchestrator, "embedder", None)
+        llm = getattr(orchestrator, "llm", None)
+        if embedder and hasattr(embedder, "_circuit_breaker"):
+            stats.append(embedder._circuit_breaker.stats())
+        if llm and hasattr(llm, "_circuit_breaker"):
+            stats.append(llm._circuit_breaker.stats())
+    except Exception:
+        pass
+    return stats
 
 
 @router.get("/health/live")

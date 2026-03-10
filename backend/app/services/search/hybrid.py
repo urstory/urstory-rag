@@ -148,19 +148,30 @@ class HybridSearchOrchestrator:
             queries = [query]
 
         # ── 1. HyDE (선택적) — 원문 쿼리에만 적용 ──
+        # Graceful Degradation: HyDE 실패 → 원본 쿼리로 검색 계속
         search_query = query
         if settings.hyde_enabled and self.hyde.should_apply(query, "all"):
             lf_span = self._lf_span(lf_trace, "hyde")
             t0 = time.perf_counter()
-            hyde_doc = await self.hyde.generate(query)
-            search_query = hyde_doc
-            trace.append(PipelineStep(
-                name="hyde",
-                passed=True,
-                duration_ms=_elapsed_ms(t0),
-                detail={"generated_length": len(hyde_doc)},
-            ))
-            self._lf_end(lf_span, {"generated_doc": hyde_doc[:200]})
+            try:
+                hyde_doc = await self.hyde.generate(query)
+                search_query = hyde_doc
+                trace.append(PipelineStep(
+                    name="hyde",
+                    passed=True,
+                    duration_ms=_elapsed_ms(t0),
+                    detail={"generated_length": len(hyde_doc)},
+                ))
+                self._lf_end(lf_span, {"generated_doc": hyde_doc[:200]})
+            except Exception as e:
+                logger.warning("HyDE 생성 실패, 원본 쿼리로 계속: %s", e)
+                trace.append(PipelineStep(
+                    name="hyde",
+                    passed=False,
+                    duration_ms=_elapsed_ms(t0),
+                    detail={"error": str(e)[:200], "fallback": "original_query"},
+                ))
+                self._lf_end(lf_span, {"error": str(e)[:200]})
 
         # ── 2. 모드별 검색 실행 × 멀티쿼리 (병렬) ──
         mode = settings.search_mode
@@ -210,6 +221,7 @@ class HybridSearchOrchestrator:
                 ))
 
         # ── 4. 리랭킹 (선택적) — 전체 합집합에 대해 1회 ──
+        # Graceful Degradation: 리랭킹 실패 → 기본 검색 결과 반환
         if settings.reranking_enabled:
             # 리랭커 입력 후보 수 제한 (Cross-Encoder 메모리 보호)
             max_rerank_candidates = settings.reranker_top_k * 4
@@ -218,18 +230,29 @@ class HybridSearchOrchestrator:
 
             lf_span = self._lf_span(lf_trace, "reranking")
             t0 = time.perf_counter()
-            documents = await self.reranker.rerank(
-                query, documents, top_k=settings.reranker_top_k,
-                score_mode=settings.reranker_score_mode,
-                alpha=settings.reranker_alpha,
-            )
-            trace.append(PipelineStep(
-                name="reranking",
-                passed=True,
-                duration_ms=_elapsed_ms(t0),
-                results_count=len(documents),
-            ))
-            self._lf_end(lf_span, {"count": len(documents)})
+            try:
+                documents = await self.reranker.rerank(
+                    query, documents, top_k=settings.reranker_top_k,
+                    score_mode=settings.reranker_score_mode,
+                    alpha=settings.reranker_alpha,
+                )
+                trace.append(PipelineStep(
+                    name="reranking",
+                    passed=True,
+                    duration_ms=_elapsed_ms(t0),
+                    results_count=len(documents),
+                ))
+                self._lf_end(lf_span, {"count": len(documents)})
+            except Exception as e:
+                logger.warning("리랭킹 실패, 기본 검색 결과로 계속: %s", e)
+                trace.append(PipelineStep(
+                    name="reranking",
+                    passed=False,
+                    duration_ms=_elapsed_ms(t0),
+                    results_count=len(documents),
+                    detail={"error": str(e)[:200], "fallback": "basic_results"},
+                ))
+                self._lf_end(lf_span, {"error": str(e)[:200]})
 
         # ── [검색 품질 게이트] 점수 기반 품질 평가 + soft_fail 근거 추출 ──
         gate_soft_failed = False

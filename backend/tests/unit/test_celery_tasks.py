@@ -18,8 +18,8 @@ class TestCelerySetup:
         assert index_document_task.name is not None
 
     def test_index_task_retry_config(self):
-        """재시도 설정 확인."""
-        assert index_document_task.max_retries == 3
+        """재시도 설정 확인 (Issue #12: 3→5로 강화)."""
+        assert index_document_task.max_retries == 5
 
 
 class TestIndexDocumentTask:

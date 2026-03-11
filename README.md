@@ -39,7 +39,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **관리자 UI** | Next.js 15 + React 19 + shadcn/ui 기반 대시보드 |
 | **Circuit Breaker + 재시도** | OpenAI/ES 호출 시 Exponential Backoff 재시도(3회) + Circuit Breaker(연속 5회 실패 시 30초 차단). 리랭킹/HyDE 실패 시 Graceful Degradation |
 | **Redis 응답 캐싱** | SHA-256 키 해싱, 설정/문서 변경 시 자동 무효화, X-Cache 헤더, 3-tier 설정 캐시 |
-| **🔥 Docling PDF 레이아웃 인식** | IBM Docling 기반 PDF 구조 분석 -- 테이블 마크다운 추출, 다단 컬럼 정렬, 정확한 헤더 감지. pypdf 대비 테이블 정확도 0%→90%+. 실패 시 pypdf 자동 폴백 |
+| **🔥 Docling PDF 레이아웃 인식** | IBM Docling 기반 PDF 구조 분석 -- 테이블 마크다운 추출, 다단 컬럼 정렬, 정확한 헤더 감지. pypdf 대비 테이블 정확도 0%→90%+. 실패 시 pypdf 자동 폴백. **GPU 없이도 동작** (CPU/MPS/CUDA 자동 감지) |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
 | **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |
 | **보안 헤더** | X-Content-Type-Options, X-Frame-Options, CSP 등 보안 미들웨어 |
@@ -101,11 +101,24 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **LLM** | OpenAI gpt-4.1-mini | -- |
 | **평가 Judge** | OpenAI gpt-4o | -- |
 | **리랭커** | dragonkue/bge-reranker-v2-m3-ko | -- |
-| **PDF 파서** | IBM Docling (레이아웃 인식 + TableFormer) | 2.78+ |
+| **PDF 파서** | IBM Docling (레이아웃 인식 + TableFormer, CPU/GPU 자동 감지) | 2.78+ |
 | **NLP** | kiwipiepy (한국어 형태소 분석) | 0.18+ |
 | **모니터링** | Langfuse v3 | 3.x |
 | **품질 평가** | RAGAS | 0.2+ |
 | **CSS** | Tailwind CSS | 4.x |
+
+### Docling PDF 파서 — GPU/CPU 호환성
+
+Docling은 **GPU 없이도 동작**한다. PyTorch가 실행 환경의 하드웨어를 자동 감지하여 최적 디바이스를 선택한다.
+
+| 환경 | GPU 가속 | 동작 방식 | 비고 |
+|------|:---:|------|------|
+| **Mac (Apple Silicon)** | MPS | Metal Performance Shaders 자동 사용 | Celery `--pool=solo` 필요 (Metal은 fork 불가) |
+| **Linux + NVIDIA** | CUDA | CUDA 자동 감지 | 가장 빠른 환경 |
+| **Linux CPU only** | -- | CPU 폴백 | 느리지만 정상 동작 |
+| **저사양 서버** | -- | 설정에서 `pdf_parser=pypdf`로 전환 가능 | pypdf는 즉시 처리 |
+
+> GPU가 없는 서버에서도 Docling은 CPU 모드로 동작한다. 처리 속도가 느릴 경우 관리자 UI에서 `pdf_parser`를 `pypdf`로 전환하면 된다. Docling 실패 시에도 pypdf로 자동 폴백하므로 서비스 중단은 없다.
 
 ---
 

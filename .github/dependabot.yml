@@ -1,0 +1,80 @@
+version: 2
+updates:
+  # Python (backend)
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "deps(backend)"
+    groups:
+      ml-libraries:
+        patterns:
+          - "torch*"
+          - "transformers*"
+          - "sentence-transformers*"
+          - "accelerate*"
+        update-types:
+          - "minor"
+          - "patch"
+      llm-clients:
+        patterns:
+          - "openai*"
+          - "anthropic*"
+          - "langfuse*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # npm (frontend)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(frontend)"
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "next*"
+          - "@tanstack/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(ci)"

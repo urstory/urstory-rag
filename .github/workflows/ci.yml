@@ -79,6 +79,11 @@ jobs:
       - name: Run tests
         run: pytest --tb=short -q -x
 
+      - name: Security audit (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit --strict --desc
+
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
@@ -105,6 +110,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Security audit (pnpm audit)
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
 
   docker-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -146,3 +155,19 @@ jobs:
           tags: |
             ghcr.io/urstory/urstory-rag-frontend:latest
             ghcr.io/urstory/urstory-rag-frontend:${{ steps.tags.outputs.sha_tag }}
+
+      - name: Trivy scan (Backend image)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/urstory/urstory-rag-api:${{ steps.tags.outputs.sha_tag }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+      - name: Trivy scan (Frontend image)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/urstory/urstory-rag-frontend:${{ steps.tags.outputs.sha_tag }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 0

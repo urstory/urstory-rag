@@ -40,6 +40,9 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **Circuit Breaker + 재시도** | OpenAI/ES 호출 시 Exponential Backoff 재시도(3회) + Circuit Breaker(연속 5회 실패 시 30초 차단). 리랭킹/HyDE 실패 시 Graceful Degradation |
 | **Redis 응답 캐싱** | SHA-256 키 해싱, 설정/문서 변경 시 자동 무효화, X-Cache 헤더, 3-tier 설정 캐시 |
 | **🔥 Docling PDF 레이아웃 인식** | IBM Docling 기반 PDF 구조 분석 -- 테이블 마크다운 추출, 다단 컬럼 정렬, 정확한 헤더 감지. pypdf 대비 테이블 정확도 0%→90%+. 실패 시 pypdf 자동 폴백. **GPU 없이도 동작** (CPU/MPS/CUDA 자동 감지) |
+| **커넥션 풀링 최적화** | DB/ES/Redis 커넥션 풀을 환경변수로 튜닝. ES httpx 영속 클라이언트로 TCP 재사용. pool_pre_ping으로 DB 재시작 자동 복구 |
+| **의존성 보안 자동화** | Dependabot 주간 자동 업데이트 (pip/npm/docker/github-actions). CI에서 pip-audit + pnpm audit + Trivy Docker 스캔 |
+| **API 문서 강화** | 40개 엔드포인트에 summary/description/에러 코드 문서화. ErrorResponse 표준 스키마. Swagger UI에서 에러 응답 확인 가능 |
 | **문서 자동 감시** | Watchdog 기반 파일 변경 감지 및 자동 인덱싱 |
 | **JWT 인증/인가** | bcrypt + HS256 JWT (access/refresh token), RBAC (admin/user) |
 | **보안 헤더** | X-Content-Type-Options, X-Frame-Options, CSP 등 보안 미들웨어 |

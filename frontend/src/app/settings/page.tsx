@@ -16,6 +16,7 @@ import {
   UserCog,
   Users,
   Activity,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ const ragCategories = [
 const accountCategories = [
   { href: "/settings/profile", label: "프로필", desc: "이름·비밀번호 변경", icon: UserCog },
   { href: "/settings/users", label: "사용자 관리", desc: "계정 생성·역할·비활성화", icon: Users, adminOnly: true },
+  { href: "/settings/api-keys", label: "API Key", desc: "외부 연동용 API 키 발급·관리", icon: KeyRound, adminOnly: true },
   { href: "/settings/system", label: "시스템 상태", desc: "컴포넌트 연결 상태·버전 정보", icon: Activity, adminOnly: true },
 ];
 

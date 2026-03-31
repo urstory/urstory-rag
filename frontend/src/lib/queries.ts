@@ -28,6 +28,7 @@ import type {
   CacheMetrics,
   AvailableModels,
   AdminUser,
+  ApiKey,
 } from "@/types";
 
 // ========== Documents ==========
@@ -328,6 +329,36 @@ export function useDeleteUser() {
     mutationFn: (id: number) => api.admin.deleteUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+// ========== API Keys ==========
+
+export function useApiKeys() {
+  return useQuery<ApiKey[]>({
+    queryKey: ["admin", "api-keys"],
+    queryFn: () => api.admin.listApiKeys(),
+  });
+}
+
+export function useCreateApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; expires_in_days?: number | null }) =>
+      api.admin.createApiKey(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "api-keys"] });
+    },
+  });
+}
+
+export function useRevokeApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.admin.revokeApiKey(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "api-keys"] });
     },
   });
 }

@@ -54,7 +54,7 @@ dependencies = [
     # 문서 변환
     "pypdf>=6.0,<7",
     "python-docx>=1.1,<2",
-    "markdown-it-py>=3.0,<4",
+    "markdown-it-py>=3.0,<5",
     "mdit_plain>=1.0,<2",
     "docling>=2.78,<3",
 

@@ -37,7 +37,7 @@ dependencies = [
     "rank-bm25>=0.2,<1",
 
     # LLM 클라이언트
-    "openai>=1.58,<2",
+    "openai>=1.58,<3",
     "anthropic>=0.40,<1",
     "httpx>=0.27,<1",
 

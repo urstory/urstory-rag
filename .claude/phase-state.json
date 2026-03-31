@@ -2,9 +2,9 @@
   "currentPhase": 17,
   "featureName": "OpenAI 호환 API + API Key 인증",
   "branchName": "feat/phase17-openai-compatible-api",
-  "currentStep": 1,
-  "status": "in_progress",
-  "completedSteps": [],
+  "currentStep": 4,
+  "status": "completed",
+  "completedSteps": ["step1-db-model", "step2-apikey-service", "step3-key-crud", "step4-openai-compat"],
   "startedAt": "2026-03-31T00:00:00+09:00",
   "relatedIssues": ["#50"]
 }

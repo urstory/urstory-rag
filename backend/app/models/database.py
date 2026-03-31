@@ -149,6 +149,23 @@ class User(Base):
     )
 
 
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    key_prefix: Mapped[str] = mapped_column(String(16))  # "rag_sk_a3Bf" (식별용)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True)  # HMAC-SHA256 해시
+    name: Mapped[str] = mapped_column(String(200))
+    is_active: Mapped[bool] = mapped_column(default=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user: Mapped["User"] = relationship()
+
+
 class WatchedFile(Base):
     __tablename__ = "watched_files"
 

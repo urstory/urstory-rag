@@ -14,15 +14,29 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Bearer 토큰에서 현재 사용자를 추출한다."""
+    """Bearer 토큰(JWT 또는 API Key)에서 현재 사용자를 추출한다."""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="인증이 필요합니다.",
         )
 
+    token = credentials.credentials
+
+    # API Key 판별: rag_sk_ 접두사 (JWT decode 전에 체크)
+    if token.startswith("rag_sk_"):
+        from app.services.apikey import authenticate_api_key
+        user = await authenticate_api_key(db, token)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않은 API Key입니다.",
+            )
+        return user
+
+    # JWT 경로
     try:
-        payload = decode_token(credentials.credentials)
+        payload = decode_token(token)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

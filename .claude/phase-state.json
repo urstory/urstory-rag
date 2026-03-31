@@ -1,10 +1,10 @@
 {
-  "currentPhase": 16,
-  "featureName": "의존성 관리 + 커넥션 풀링 + API 문서 강화",
-  "branchName": "feat/phase16-dependency-pooling-apidocs",
-  "currentStep": 3,
-  "status": "completed",
-  "completedSteps": ["step1-dependency-management", "step2-connection-pooling", "step3-api-docs"],
+  "currentPhase": 17,
+  "featureName": "OpenAI 호환 API + API Key 인증",
+  "branchName": "feat/phase17-openai-compatible-api",
+  "currentStep": 1,
+  "status": "in_progress",
+  "completedSteps": [],
   "startedAt": "2026-03-31T00:00:00+09:00",
-  "relatedIssues": ["#19", "#11", "#14"]
+  "relatedIssues": ["#50"]
 }

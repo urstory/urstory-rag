@@ -66,6 +66,31 @@ stop_frontend() {
     fi
 }
 
+# --- Celery 워커 종료 ---
+stop_worker() {
+    local found=0
+
+    if [ -f "$ROOT_DIR/.celery.pid" ]; then
+        pid=$(cat "$ROOT_DIR/.celery.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid"
+            log "Celery 워커 종료 (PID: $pid)"
+            found=1
+        fi
+        rm -f "$ROOT_DIR/.celery.pid"
+    fi
+
+    if [ $found -eq 0 ]; then
+        pids=$(pgrep -f "celery.*app.worker" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs kill 2>/dev/null || true
+            log "Celery 프로세스 종료 (PID: $pids)"
+        else
+            warn "실행 중인 Celery 워커 없음"
+        fi
+    fi
+}
+
 # --- 인프라 종료 (shared-postgres는 공용이므로 유지) ---
 stop_infra() {
     log "인프라 종료 (ES + Redis)..."
@@ -77,24 +102,28 @@ stop_infra() {
 # --- 메인 ---
 case "${1:-app}" in
     --backend)  stop_backend ;;
+    --worker)   stop_worker ;;
     --frontend) stop_frontend ;;
     --infra)    stop_infra ;;
     --all)
         stop_backend
+        stop_worker
         stop_frontend
         stop_infra
         ;;
     --app|app)
         stop_backend
+        stop_worker
         stop_frontend
         log "인프라(ES, Redis, PostgreSQL)는 유지됩니다. 종료하려면: ./scripts/stop.sh --all"
         ;;
     *)
-        echo "사용법: $0 [--app | --all | --backend | --frontend | --infra]"
+        echo "사용법: $0 [--app | --all | --backend | --worker | --frontend | --infra]"
         echo ""
-        echo "  (기본)    앱만 종료 (백엔드 + 프론트엔드)"
+        echo "  (기본)    앱만 종료 (백엔드 + 워커 + 프론트엔드)"
         echo "  --all     앱 + 인프라(ES, Redis) 종료"
         echo "  --backend 백엔드만 종료"
+        echo "  --worker  Celery 워커만 종료"
         echo "  --frontend 프론트엔드만 종료"
         echo "  --infra   인프라(ES, Redis)만 종료"
         echo ""

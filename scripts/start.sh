@@ -89,6 +89,29 @@ start_backend() {
     warn "백엔드 기동 대기 타임아웃 — 로그 확인: tail -f logs/backend.log"
 }
 
+# --- Celery 워커 ---
+start_worker() {
+    if pgrep -f "celery.*app.worker" >/dev/null 2>&1; then
+        warn "Celery 워커가 이미 실행 중"
+        return 0
+    fi
+
+    log "Celery 워커 시작 (문서 인덱싱, 평가 실행)..."
+    mkdir -p logs
+    cd backend && source .venv/bin/activate && \
+        nohup celery -A app.worker:celery_app worker --pool=solo --loglevel=info \
+        > ../logs/celery.log 2>&1 &
+    echo $! > "$ROOT_DIR/.celery.pid"
+    cd "$ROOT_DIR"
+
+    sleep 2
+    if pgrep -f "celery.*app.worker" >/dev/null 2>&1; then
+        log "Celery 워커 ready (로그: logs/celery.log)"
+    else
+        warn "Celery 워커 시작 실패 — 로그 확인: tail -f logs/celery.log"
+    fi
+}
+
 # --- 프론트엔드 ---
 start_frontend() {
     if lsof -ti :3500 >/dev/null 2>&1; then
@@ -117,6 +140,11 @@ print_status() {
         s=$(docker inspect "$svc" --format '{{.State.Health.Status}}' 2>/dev/null || echo "stopped")
         printf "  %-24s %s\n" "$svc" "$s"
     done
+    if pgrep -f "celery.*app.worker" >/dev/null 2>&1; then
+        printf "  %-24s %s\n" "Celery 워커" "running"
+    else
+        printf "  %-24s %s\n" "Celery 워커" "stopped"
+    fi
     for port_name in "8000:백엔드" "3500:프론트엔드"; do
         port=${port_name%%:*}
         name=${port_name##*:}
@@ -141,14 +169,16 @@ case "${1:-all}" in
     --infra)    start_infra ;;
     --backend)  start_backend ;;
     --frontend) start_frontend ;;
+    --worker)   start_worker ;;
     --all|all)
         start_infra
         start_backend
+        start_worker
         start_frontend
         print_status
         ;;
     *)
-        echo "사용법: $0 [--all | --infra | --backend | --frontend]"
+        echo "사용법: $0 [--all | --infra | --backend | --worker | --frontend]"
         exit 1
         ;;
 esac

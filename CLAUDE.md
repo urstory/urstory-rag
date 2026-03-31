@@ -7,6 +7,7 @@
 
 ## 개발 환경
 - 현재 개발 머신: Mac Studio (Apple Silicon)
+- **로컬 PostgreSQL 14 (Homebrew)가 포트 5432에서 상시 실행 중** — 프로젝트 인프라(`infra/docker-compose.yml`)의 PostgreSQL 포트가 충돌하지 않도록 `POSTGRES_PORT` 환경변수로 다른 포트(예: 5433) 사용 필수
 - **LLM/임베딩: OpenAI API만 사용** (Ollama 사용하지 않음)
   - 임베딩: text-embedding-3-small
   - LLM: gpt-4.1-mini (답변 생성, HyDE)

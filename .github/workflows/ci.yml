@@ -139,7 +139,7 @@ jobs:
           echo "sha_tag=${SHA}" >> $GITHUB_OUTPUT
 
       - name: Build & Push Backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -148,7 +148,7 @@ jobs:
             ghcr.io/urstory/urstory-rag-api:${{ steps.tags.outputs.sha_tag }}
 
       - name: Build & Push Frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: true

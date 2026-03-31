@@ -29,7 +29,7 @@ dependencies = [
     "celery[redis]>=5.4,<6",
 
     # ML/NLP
-    "transformers>=4.47,<5",
+    "transformers>=4.47,<6",
     "sentence-transformers>=3.3,<4",
     "torch>=2.5,<3",
     "accelerate>=1.0,<2",

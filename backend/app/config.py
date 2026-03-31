@@ -31,6 +31,22 @@ class Settings(BaseSettings):
     sentry_environment: str = "development"
     sentry_traces_sample_rate: float = 0.1
 
+    # 커넥션 풀 설정
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_pre_ping: bool = True
+    db_pool_recycle: int = 1800  # 30분 (초)
+    db_pool_timeout: int = 30
+
+    es_max_connections: int = 20
+    es_request_timeout: float = 30.0
+    es_max_retries: int = 3
+
+    redis_max_connections: int = 20
+    redis_socket_timeout: float = 5.0
+    redis_socket_connect_timeout: float = 5.0
+    redis_retry_on_timeout: bool = True
+
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     langfuse_public_key: str | None = None

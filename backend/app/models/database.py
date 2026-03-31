@@ -169,7 +169,17 @@ _async_session_factory = None
 
 def init_db(database_url: str):
     global _engine, _async_session_factory
-    _engine = create_async_engine(database_url, echo=False, pool_size=10, max_overflow=20)
+    from app.config import get_settings
+    s = get_settings()
+    _engine = create_async_engine(
+        database_url,
+        echo=False,
+        pool_size=s.db_pool_size,
+        max_overflow=s.db_max_overflow,
+        pool_pre_ping=s.db_pool_pre_ping,
+        pool_recycle=s.db_pool_recycle,
+        pool_timeout=s.db_pool_timeout,
+    )
     _async_session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
 

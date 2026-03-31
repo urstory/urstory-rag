@@ -113,6 +113,7 @@ async def lifespan(app: FastAPI):
 
     vector_engine = VectorSearchEngine(session_factory=_async_session_factory)
     keyword_engine = ElasticsearchNoriEngine(es_url=env.elasticsearch_url)
+    app.state.keyword_engine = keyword_engine
     reranker = KoreanCrossEncoder()
     hyde_generator = HyDEGenerator(llm=llm)
 
@@ -166,6 +167,11 @@ async def lifespan(app: FastAPI):
     logger.info("graceful_shutdown_started")
 
     await asyncio.sleep(1)
+
+    # ES httpx 클라이언트 정리
+    if hasattr(app.state, 'keyword_engine'):
+        await app.state.keyword_engine.close()
+        logger.info("es_keyword_client_closed")
 
     from app.redis import close_redis
     await close_redis()

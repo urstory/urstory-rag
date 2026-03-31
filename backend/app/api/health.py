@@ -88,10 +88,14 @@ async def health_check():
     # Circuit Breaker 상태 수집
     circuit_breakers = _collect_circuit_breaker_stats()
 
+    # 커넥션 풀 상태 수집
+    pool_status = await _collect_pool_stats()
+
     return {
         "status": "ok" if required_ok else "degraded",
         "version": _get_version(),
         "circuit_breakers": circuit_breakers,
+        "connection_pools": pool_status,
         "components": {
             "database": {
                 "status": "connected" if db_ok else "disconnected",
@@ -119,6 +123,33 @@ async def health_check():
             },
         },
     }
+
+
+async def _collect_pool_stats() -> dict:
+    """커넥션 풀 상태를 수집한다."""
+    result = {}
+    try:
+        from app.models.database import get_engine
+        engine = get_engine()
+        if engine:
+            pool = engine.pool
+            result["database"] = {
+                "pool_size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+            }
+    except Exception:
+        pass
+    try:
+        from app.redis import _pool as redis_pool
+        if redis_pool:
+            result["redis"] = {
+                "max_connections": redis_pool.max_connections,
+            }
+    except Exception:
+        pass
+    return result
 
 
 def _collect_circuit_breaker_stats() -> list[dict]:

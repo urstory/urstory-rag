@@ -21,7 +21,7 @@ def get_settings_service(db: AsyncSession = Depends(get_db)) -> SettingsService:
     return _settings_service
 
 
-@router.get("/settings", response_model=SettingsResponse)
+@router.get("/settings", response_model=SettingsResponse, summary="RAG 설정 조회", tags=["settings"])
 async def get_settings(
     service: SettingsService = Depends(get_settings_service),
     _admin: User = Depends(require_admin),
@@ -30,7 +30,13 @@ async def get_settings(
     return settings.model_dump()
 
 
-@router.patch("/settings", response_model=SettingsResponse)
+@router.patch(
+    "/settings",
+    response_model=SettingsResponse,
+    summary="RAG 설정 변경",
+    description="변경할 필드만 전송합니다. 변경 시 검색 캐시가 자동 무효화됩니다.",
+    tags=["settings"],
+)
 async def patch_settings(
     updates: SettingsUpdateRequest,
     service: SettingsService = Depends(get_settings_service),
@@ -56,7 +62,7 @@ async def patch_settings(
     return updated.model_dump()
 
 
-@router.get("/settings/models")
+@router.get("/settings/models", summary="사용 가능한 LLM 모델 목록", tags=["settings"])
 async def get_available_models(_admin: User = Depends(require_admin)):
     env = get_env_settings()
     models = {"openai": [], "embedding": []}

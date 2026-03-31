@@ -22,7 +22,8 @@ class ElasticsearchNoriEngine:
     Nori 형태소 분석은 인덱스 매핑 레벨에서 설정되므로,
     쿼리 시에는 단순 match 쿼리만 전송하면 된다.
 
-    재시도: 최대 3회 (연결 실패, 타임아웃 시)
+    재시도: 최대 N회 (연결 실패, 타임아웃 시), 설정으로 제어.
+    httpx 클라이언트를 영속적으로 유지하여 TCP 연결을 재사용한다.
     """
 
     def __init__(
@@ -30,8 +31,25 @@ class ElasticsearchNoriEngine:
         es_url: str = "http://localhost:9200",
         index_name: str = "rag_chunks",
     ) -> None:
+        from app.config import get_settings
+        s = get_settings()
         self.es_url = es_url
         self.index_name = index_name
+        self._max_retries = s.es_max_retries
+        self._client = httpx.AsyncClient(
+            base_url=es_url,
+            timeout=httpx.Timeout(s.es_request_timeout),
+            limits=httpx.Limits(
+                max_connections=s.es_max_connections,
+                max_keepalive_connections=s.es_max_connections // 2,
+                keepalive_expiry=30,
+            ),
+            transport=httpx.AsyncHTTPTransport(retries=s.es_max_retries),
+        )
+
+    async def close(self) -> None:
+        """앱 종료 시 httpx 클라이언트 정리."""
+        await self._client.aclose()
 
     async def search(
         self,
@@ -55,27 +73,24 @@ class ElasticsearchNoriEngine:
         body = self._build_query(query, top_k, doc_id)
 
         last_error: Exception | None = None
-        max_retries = 3
 
-        for attempt in range(max_retries + 1):
+        for attempt in range(self._max_retries + 1):
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{self.es_url}/{self.index_name}/_search",
-                        json=body,
-                        timeout=30.0,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
+                response = await self._client.post(
+                    f"/{self.index_name}/_search",
+                    json=body,
+                )
+                response.raise_for_status()
+                data = response.json()
                 return self._parse_hits(data)
             except _RETRYABLE_ES as e:
                 last_error = e
-                if attempt < max_retries:
+                if attempt < self._max_retries:
                     delay = min(1.0 * (2 ** attempt), 15.0)
                     jitter = delay * random.uniform(0.5, 1.0)
                     logger.warning(
                         "ES 검색 재시도 %d/%d — %s (%.1f초 후)",
-                        attempt + 1, max_retries, str(e)[:100], jitter,
+                        attempt + 1, self._max_retries, str(e)[:100], jitter,
                     )
                     await asyncio.sleep(jitter)
             except Exception as e:
@@ -84,7 +99,7 @@ class ElasticsearchNoriEngine:
                 ) from e
 
         raise SearchServiceError(
-            f"Elasticsearch keyword search failed after {max_retries} retries: {last_error}"
+            f"Elasticsearch keyword search failed after {self._max_retries} retries: {last_error}"
         ) from last_error
 
     def _build_query(

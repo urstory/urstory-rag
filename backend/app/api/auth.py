@@ -76,7 +76,19 @@ class PasswordChangeRequest(BaseModel):
 # --- Endpoints ---
 
 
-@router.post("/signup", status_code=201, response_model=UserResponse)
+@router.post(
+    "/signup",
+    status_code=201,
+    response_model=UserResponse,
+    summary="회원가입",
+    description="새 사용자를 등록합니다. ALLOW_PUBLIC_SIGNUP=false이면 403을 반환합니다.",
+    responses={
+        403: {"description": "공개 회원가입 비활성화"},
+        409: {"description": "이미 등록된 아이디"},
+        422: {"description": "비밀번호 정책 미충족"},
+        429: {"description": "Rate limit 초과 (3회/분)"},
+    },
+)
 @limiter.limit("3/minute")
 async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depends(get_db)):
     """회원가입. ALLOW_PUBLIC_SIGNUP=false이면 403."""
@@ -115,7 +127,18 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="로그인",
+    description="아이디/비밀번호로 로그인합니다. access_token은 응답 본문, "
+                "refresh_token은 HttpOnly Cookie로 반환됩니다.",
+    responses={
+        401: {"description": "아이디 또는 비밀번호 불일치"},
+        403: {"description": "비활성화된 계정"},
+        429: {"description": "Rate limit 초과 (5회/분)"},
+    },
+)
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     """로그인 → access_token (body) + refresh_token (HttpOnly Cookie)."""
@@ -144,7 +167,13 @@ async def login(request: Request, body: LoginRequest, response: Response, db: As
     return TokenResponse(access_token=access_token)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="토큰 갱신",
+    description="Cookie의 refresh_token으로 새 access_token을 발급합니다. Refresh token rotation 적용.",
+    responses={401: {"description": "유효하지 않은 리프레시 토큰"}},
+)
 async def refresh(
     response: Response,
     refresh_token: str | None = Cookie(default=None),
@@ -197,7 +226,7 @@ async def refresh(
     return TokenResponse(access_token=access_token)
 
 
-@router.post("/logout")
+@router.post("/logout", summary="로그아웃", description="Cookie 삭제 및 토큰 블랙리스트 등록.")
 async def logout(
     response: Response,
     refresh_token: str | None = Cookie(default=None),
@@ -221,7 +250,7 @@ async def logout(
     return {"message": "로그아웃되었습니다."}
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, summary="내 정보 조회")
 async def get_me(user: User = Depends(get_current_user)):
     """현재 사용자 정보."""
     return UserResponse(
@@ -230,7 +259,7 @@ async def get_me(user: User = Depends(get_current_user)):
     )
 
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserResponse, summary="프로필 수정")
 async def update_profile(
     body: ProfileUpdateRequest,
     user: User = Depends(get_current_user),
@@ -250,7 +279,11 @@ async def update_profile(
     )
 
 
-@router.put("/me/password")
+@router.put(
+    "/me/password",
+    summary="비밀번호 변경",
+    responses={400: {"description": "현재 비밀번호 불일치"}, 422: {"description": "비밀번호 정책 미충족"}},
+)
 async def change_password(
     body: PasswordChangeRequest,
     user: User = Depends(get_current_user),

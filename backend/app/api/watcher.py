@@ -8,14 +8,14 @@ from app.services.document.watcher import get_watcher_service
 router = APIRouter(tags=["watcher"])
 
 
-@router.get("/watcher/status")
+@router.get("/watcher/status", summary="감시 상태 조회")
 async def get_watcher_status(_admin: User = Depends(require_admin)):
     """감시 상태 조회."""
     service = get_watcher_service()
     return service.get_status()
 
 
-@router.post("/watcher/start")
+@router.post("/watcher/start", summary="디렉토리 감시 시작")
 async def start_watcher(
     directories: list[str] | None = Query(default=None),
     use_polling: bool = False,
@@ -34,7 +34,7 @@ async def start_watcher(
     return {"message": "감시가 시작되었습니다", "running": True, "directories": dirs}
 
 
-@router.post("/watcher/stop")
+@router.post("/watcher/stop", summary="디렉토리 감시 중지")
 async def stop_watcher(_admin: User = Depends(require_admin)):
     """감시 중지."""
     service = get_watcher_service()
@@ -42,7 +42,7 @@ async def stop_watcher(_admin: User = Depends(require_admin)):
     return {"message": "감시가 중지되었습니다", "running": False}
 
 
-@router.post("/watcher/scan")
+@router.post("/watcher/scan", summary="수동 전체 스캔")
 async def trigger_scan(_admin: User = Depends(require_admin)):
     """수동 전체 스캔."""
     service = get_watcher_service()

@@ -1,7 +1,47 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+# --- 공통 에러 응답 스키마 ---
+
+
+class ErrorDetail(BaseModel):
+    """개별 에러 상세."""
+    field: str | None = None
+    message: str
+    code: str
+
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [
+            {"field": "query", "message": "검색어는 1자 이상이어야 합니다", "code": "VALIDATION_ERROR"}
+        ]
+    })
+
+
+class ErrorResponse(BaseModel):
+    """표준 에러 응답."""
+    status: int
+    error: str
+    message: str
+    details: list[ErrorDetail] | None = None
+    request_id: str | None = None
+
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [
+            {
+                "status": 401,
+                "error": "TOKEN_EXPIRED",
+                "message": "인증 토큰이 만료되었습니다",
+                "details": None,
+                "request_id": "req_abc123",
+            }
+        ]
+    })
+
+
+# --- 헬스 ---
 
 
 class HealthResponse(BaseModel):
@@ -36,6 +76,17 @@ class SearchRequest(BaseModel):
     reranking_enabled: bool | None = None
     multi_query_enabled: bool | None = None
     generate_answer: bool = True
+
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [
+            {
+                "query": "한국의 GDP 성장률은?",
+                "top_k": 5,
+                "search_mode": "hybrid",
+                "generate_answer": True,
+            }
+        ]
+    })
 
 
 class SearchResult(BaseModel):

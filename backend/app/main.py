@@ -113,6 +113,7 @@ async def lifespan(app: FastAPI):
 
     vector_engine = VectorSearchEngine(session_factory=_async_session_factory)
     keyword_engine = ElasticsearchNoriEngine(es_url=env.elasticsearch_url)
+    app.state.keyword_engine = keyword_engine
     reranker = KoreanCrossEncoder()
     hyde_generator = HyDEGenerator(llm=llm)
 
@@ -167,6 +168,11 @@ async def lifespan(app: FastAPI):
 
     await asyncio.sleep(1)
 
+    # ES httpx 클라이언트 정리
+    if hasattr(app.state, 'keyword_engine'):
+        await app.state.keyword_engine.close()
+        logger.info("es_keyword_client_closed")
+
     from app.redis import close_redis
     await close_redis()
 
@@ -182,7 +188,26 @@ async def lifespan(app: FastAPI):
     logger.info("graceful_shutdown_completed")
 
 
-app = FastAPI(title="UrstoryRAG", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="UrstoryRAG API",
+    description="한국어 특화 RAG(Retrieval-Augmented Generation) 시스템 API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_tags=[
+        {"name": "health", "description": "시스템 상태 확인 (liveness, readiness, startup)"},
+        {"name": "auth", "description": "인증 및 사용자 관리 (JWT 기반)"},
+        {"name": "search", "description": "문서 검색 및 RAG 답변 생성"},
+        {"name": "documents", "description": "문서 업로드 및 관리"},
+        {"name": "settings", "description": "RAG 설정 관리 (관리자 전용)"},
+        {"name": "evaluation", "description": "RAG 품질 평가 (RAGAS)"},
+        {"name": "admin", "description": "관리자 전용 사용자 관리"},
+        {"name": "monitoring", "description": "시스템 모니터링 및 Langfuse 트레이스"},
+        {"name": "system", "description": "시스템 재인덱싱 및 작업 상태"},
+        {"name": "watcher", "description": "디렉토리 감시 제어"},
+    ],
+)
 
 # CORS — 환경변수 기반 화이트리스트
 env = get_settings()
@@ -225,7 +250,13 @@ async def rag_exception_handler(request: Request, exc: RAGException):
     request_id = _get_request_id()
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.error_code, "message": str(exc), "request_id": request_id},
+        content={
+            "status": exc.status_code,
+            "error": exc.error_code,
+            "message": str(exc),
+            "details": None,
+            "request_id": request_id,
+        },
         headers={"X-Request-ID": request_id},
     )
 
@@ -237,8 +268,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={
-            "error": "internal_error",
+            "status": 500,
+            "error": "INTERNAL_ERROR",
             "message": "내부 오류가 발생했습니다.",
+            "details": None,
             "request_id": request_id,
         },
         headers={"X-Request-ID": request_id},

@@ -12,7 +12,7 @@ from app.services.document.reindexer import ReindexService
 router = APIRouter(tags=["system"])
 
 
-@router.post("/system/reindex-all")
+@router.post("/system/reindex-all", summary="전체 재인덱싱 시작")
 async def reindex_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """비동기 전체 재인덱싱 시작."""
     service = ReindexService()
@@ -29,7 +29,11 @@ async def reindex_all(db: AsyncSession = Depends(get_db), _admin: User = Depends
     return {"task_id": task_id, "status": "pending"}
 
 
-@router.get("/system/tasks/{task_id}")
+@router.get(
+    "/system/tasks/{task_id}",
+    summary="작업 상태 확인",
+    responses={404: {"description": "작업을 찾을 수 없음"}},
+)
 async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """작업 상태 확인."""
     task = await db.get(Task, uuid.UUID(task_id))
@@ -46,7 +50,7 @@ async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db), _adm
     }
 
 
-@router.get("/system/status")
+@router.get("/system/status", summary="서비스 연결 상태")
 async def system_status(_admin: User = Depends(require_admin)):
     """DB, ES, OpenAI, Redis 연결 상태."""
     from app.api.health import check_db, check_elasticsearch, check_openai, check_redis

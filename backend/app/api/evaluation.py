@@ -77,7 +77,7 @@ class EvaluationCompareResponse(BaseModel):
 # --- Datasets CRUD ---
 
 
-@router.post("/evaluation/datasets", status_code=201, response_model=DatasetResponse)
+@router.post("/evaluation/datasets", status_code=201, response_model=DatasetResponse, summary="평가 데이터셋 생성")
 async def create_dataset(
     body: DatasetCreateRequest,
     db: AsyncSession = Depends(get_db),
@@ -98,7 +98,7 @@ async def create_dataset(
     )
 
 
-@router.get("/evaluation/datasets", response_model=DatasetListResponse)
+@router.get("/evaluation/datasets", response_model=DatasetListResponse, summary="평가 데이터셋 목록")
 async def list_datasets(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     count_result = await db.execute(select(func.count(EvaluationDataset.id)))
     total = count_result.scalar() or 0
@@ -122,7 +122,12 @@ async def list_datasets(db: AsyncSession = Depends(get_db), _admin: User = Depen
     )
 
 
-@router.get("/evaluation/datasets/{dataset_id}", response_model=DatasetResponse)
+@router.get(
+    "/evaluation/datasets/{dataset_id}",
+    response_model=DatasetResponse,
+    summary="평가 데이터셋 상세",
+    responses={404: {"description": "데이터셋을 찾을 수 없음"}},
+)
 async def get_dataset(dataset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     result = await db.execute(
         select(EvaluationDataset).where(EvaluationDataset.id == dataset_id)
@@ -141,7 +146,14 @@ async def get_dataset(dataset_id: uuid.UUID, db: AsyncSession = Depends(get_db),
 # --- Evaluation Runs ---
 
 
-@router.post("/evaluation/run", status_code=201, response_model=EvaluationRunResponse)
+@router.post(
+    "/evaluation/run",
+    status_code=201,
+    response_model=EvaluationRunResponse,
+    summary="평가 실행 시작",
+    description="데이터셋 ID를 받아 비동기 RAGAS 평가를 시작합니다.",
+    responses={404: {"description": "데이터셋을 찾을 수 없음"}},
+)
 async def start_evaluation_run(
     body: EvaluationRunRequest,
     db: AsyncSession = Depends(get_db),
@@ -173,7 +185,7 @@ async def start_evaluation_run(
     return _run_to_response(run)
 
 
-@router.get("/evaluation/runs", response_model=EvaluationRunListResponse)
+@router.get("/evaluation/runs", response_model=EvaluationRunListResponse, summary="평가 실행 목록")
 async def list_evaluation_runs(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     count_result = await db.execute(select(func.count(EvaluationRun.id)))
     total = count_result.scalar() or 0
@@ -189,7 +201,12 @@ async def list_evaluation_runs(db: AsyncSession = Depends(get_db), _admin: User 
     )
 
 
-@router.get("/evaluation/runs/{run_id}", response_model=EvaluationRunResponse)
+@router.get(
+    "/evaluation/runs/{run_id}",
+    response_model=EvaluationRunResponse,
+    summary="평가 실행 결과 상세",
+    responses={404: {"description": "평가 실행을 찾을 수 없음"}},
+)
 async def get_evaluation_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     result = await db.execute(
         select(EvaluationRun).where(EvaluationRun.id == run_id)
@@ -203,6 +220,8 @@ async def get_evaluation_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_d
 @router.get(
     "/evaluation/runs/{run_id1}/compare/{run_id2}",
     response_model=EvaluationCompareResponse,
+    summary="두 평가 실행 비교",
+    responses={404: {"description": "평가 실행을 찾을 수 없음"}},
 )
 async def compare_evaluation_runs(
     run_id1: uuid.UUID,

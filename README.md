@@ -254,6 +254,58 @@ LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxx
 | 프론트엔드 관리자 UI | http://localhost:3500 |
 | Langfuse 대시보드 | http://localhost:3100 |
 
+### Step 8: 외부 연동 (OpenAI 호환 API)
+
+다른 프로젝트에서 UrstoryRAG를 사용하려면 **API Key를 발급**하고 **OpenAI SDK로 호출**한다.
+
+#### 1. API Key 발급 (관리자 UI)
+
+1. http://localhost:3500 에 관리자로 로그인한다.
+2. **설정 > API Key** 페이지로 이동한다.
+3. **새 API Key** 버튼을 클릭하고 이름을 입력한다 (예: "사내 포털 연동").
+4. 생성된 키(`rag_sk_xxxxx...`)를 **반드시 복사**한다. 이 키는 다시 볼 수 없다.
+
+#### 2. API 호출 (Python — OpenAI SDK)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="rag_sk_xxxxx...",  # 발급받은 키
+)
+
+response = client.chat.completions.create(
+    model="urstory-rag",
+    messages=[{"role": "user", "content": "법인 포인트는 몇개월 조회가능한가요?"}],
+)
+print(response.choices[0].message.content)
+# → "법인 포인트는 최대 3개월까지 조회 가능합니다."
+```
+
+#### 3. API 호출 (curl)
+
+```bash
+curl -s -X POST http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer rag_sk_xxxxx..." \
+  -H "Content-Type: application/json" \
+  -d '{"model":"urstory-rag","messages":[{"role":"user","content":"질문 내용"}]}' \
+  | python3 -m json.tool
+```
+
+#### 4. 스트리밍 호출
+
+```python
+for chunk in client.chat.completions.create(
+    model="urstory-rag",
+    messages=[{"role": "user", "content": "질문 내용"}],
+    stream=True,
+):
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+> LangChain, LlamaIndex 등 OpenAI 호환 프레임워크에서도 `base_url`과 `api_key`만 변경하면 바로 사용 가능하다.
+
 ---
 
 ## 프로젝트 구조

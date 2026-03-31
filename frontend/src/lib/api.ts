@@ -27,6 +27,8 @@ import type {
   SystemStatus,
   HealthCheck,
   AdminUser,
+  ApiKey,
+  ApiKeyCreateResponse,
 } from "@/types";
 
 const API_BASE = "";
@@ -254,6 +256,12 @@ export const api = {
       fetchJSON<AdminUser>(`/api/admin/users/${id}`, { method: "PUT", body: data }),
     deleteUser: (id: number) =>
       fetchJSON<{ message: string; id: number }>(`/api/admin/users/${id}`, { method: "DELETE" }),
+    listApiKeys: () =>
+      fetchJSON<ApiKey[]>("/api/admin/api-keys"),
+    createApiKey: (data: { name: string; expires_in_days?: number | null }) =>
+      fetchJSON<ApiKeyCreateResponse>("/api/admin/api-keys", { method: "POST", body: data }),
+    revokeApiKey: (id: string) =>
+      fetchJSON<{ message: string; id: string }>(`/api/admin/api-keys/${id}`, { method: "DELETE" }),
   },
   documents: {
     list: (params?: DocumentListParams) => {

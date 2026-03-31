@@ -33,6 +33,22 @@ export interface AdminUser {
   created_at: string | null;
 }
 
+// ========== API Keys ==========
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  is_active: boolean;
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreateResponse extends ApiKey {
+  key: string; // 평문 키 (생성 시 1회만 반환)
+}
+
 // ========== Documents ==========
 
 export interface Document {

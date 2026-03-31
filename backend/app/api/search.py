@@ -13,6 +13,7 @@ from app.middleware.rate_limit import limiter
 from app.models.database import User
 from app.models.schemas import (
     DebugSearchResponse,
+    ErrorResponse,
     SearchRequest,
     SearchResponse,
     SearchResult,
@@ -82,7 +83,18 @@ async def _apply_overrides(
     return base
 
 
-@router.post("/search", response_model=SearchResponse)
+@router.post(
+    "/search",
+    response_model=SearchResponse,
+    summary="문서 검색 및 답변 생성",
+    description="하이브리드 검색(벡터+키워드)으로 관련 문서를 찾고, LLM이 답변을 생성합니다. "
+                "search_mode, hyde_enabled 등을 요청별로 오버라이드할 수 있습니다.",
+    responses={
+        422: {"model": ErrorResponse, "description": "요청 유효성 검사 실패"},
+        429: {"model": ErrorResponse, "description": "Rate limit 초과 (30회/분)"},
+        503: {"model": ErrorResponse, "description": "검색 엔진 또는 LLM 서비스 연결 실패"},
+    },
+)
 @limiter.limit("30/minute")
 async def search(
     request: Request,
@@ -129,7 +141,18 @@ async def search(
     return response_data
 
 
-@router.post("/search/debug", response_model=DebugSearchResponse)
+@router.post(
+    "/search/debug",
+    response_model=DebugSearchResponse,
+    summary="검색 + 파이프라인 디버그 트레이스",
+    description="검색 결과와 함께 각 파이프라인 단계(벡터 검색, 리랭킹, HyDE 등)의 "
+                "실행 시간과 결과 수를 포함하는 트레이스를 반환합니다.",
+    responses={
+        422: {"model": ErrorResponse, "description": "요청 유효성 검사 실패"},
+        429: {"model": ErrorResponse, "description": "Rate limit 초과 (30회/분)"},
+        503: {"model": ErrorResponse, "description": "검색 엔진 또는 LLM 서비스 연결 실패"},
+    },
+)
 @limiter.limit("30/minute")
 async def search_debug(
     request: Request,

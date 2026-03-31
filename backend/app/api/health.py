@@ -75,7 +75,12 @@ async def check_redis() -> bool:
         return False
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="전체 시스템 상태 확인",
+    description="PostgreSQL, Elasticsearch, Redis, OpenAI API의 연결 상태와 "
+                "Circuit Breaker 상태, 커넥션 풀 통계를 반환합니다.",
+)
 async def health_check():
     """전체 시스템 상태 (관리자 대시보드용)."""
     db_ok = await check_db()
@@ -171,13 +176,17 @@ def _collect_circuit_breaker_stats() -> list[dict]:
     return stats
 
 
-@router.get("/health/live")
+@router.get("/health/live", summary="Liveness Probe")
 async def liveness():
     """Liveness Probe — 프로세스 생존 확인."""
     return {"status": "ok"}
 
 
-@router.get("/health/ready")
+@router.get(
+    "/health/ready",
+    summary="Readiness Probe",
+    description="DB, ES, Redis 연결 상태를 확인합니다. 모두 정상이면 200, 아니면 503을 반환합니다.",
+)
 async def readiness():
     """Readiness Probe — DB, ES, Redis 연결 확인."""
     db_ok = await check_db()
@@ -200,7 +209,7 @@ async def readiness():
     )
 
 
-@router.get("/health/startup")
+@router.get("/health/startup", summary="Startup Probe")
 async def startup_check(request: Request):
     """Startup Probe — 초기화 완료 확인."""
     ready = getattr(request.app.state, "startup_complete", False)

@@ -26,7 +26,7 @@ async def _invalidate_document_caches() -> None:
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
 
-@router.get("/documents")
+@router.get("/documents", summary="문서 목록 조회", description="페이징, 정렬, 소스 필터 지원.")
 async def list_documents(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -71,7 +71,12 @@ async def list_documents(
     }
 
 
-@router.post("/documents/upload", status_code=201)
+@router.post(
+    "/documents/upload",
+    status_code=201,
+    summary="문서 업로드",
+    description="파일을 업로드하면 즉시 응답 후 Celery로 비동기 인덱싱을 시작합니다.",
+)
 async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -117,7 +122,11 @@ async def upload_document(
     return {"id": str(doc.id), "status": status, "filename": doc.filename}
 
 
-@router.get("/documents/{doc_id}")
+@router.get(
+    "/documents/{doc_id}",
+    summary="문서 상세 조회",
+    responses={404: {"description": "문서를 찾을 수 없음"}},
+)
 async def get_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 상세."""
     doc = await db.get(Document, uuid.UUID(doc_id))
@@ -126,7 +135,12 @@ async def get_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: 
     return _doc_to_dict(doc)
 
 
-@router.delete("/documents/{doc_id}")
+@router.delete(
+    "/documents/{doc_id}",
+    summary="문서 삭제",
+    description="문서 파일, DB 레코드, ES 인덱스를 모두 삭제합니다.",
+    responses={404: {"description": "문서를 찾을 수 없음"}},
+)
 async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 삭제."""
     doc = await db.get(Document, uuid.UUID(doc_id))
@@ -143,7 +157,11 @@ async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admi
     return {"message": "deleted", "id": doc_id}
 
 
-@router.post("/documents/{doc_id}/reindex")
+@router.post(
+    "/documents/{doc_id}/reindex",
+    summary="문서 재인덱싱",
+    responses={404: {"description": "문서를 찾을 수 없음"}},
+)
 async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """단일 문서 재인덱싱."""
     doc = await db.get(Document, uuid.UUID(doc_id))
@@ -160,7 +178,11 @@ async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _adm
     return {"id": doc_id, "status": "reindexing"}
 
 
-@router.get("/documents/{doc_id}/chunks")
+@router.get(
+    "/documents/{doc_id}/chunks",
+    summary="문서 청크 목록",
+    responses={404: {"description": "문서를 찾을 수 없음"}},
+)
 async def get_document_chunks(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """청크 목록."""
     doc = await db.get(Document, uuid.UUID(doc_id))

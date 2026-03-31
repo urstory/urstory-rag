@@ -46,7 +46,7 @@ class CostResponse(BaseModel):
 # --- Stats ---
 
 
-@router.get("/monitoring/stats", response_model=MonitoringStatsResponse)
+@router.get("/monitoring/stats", response_model=MonitoringStatsResponse, summary="시스템 통계 조회")
 async def get_stats(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """집계 통계를 반환한다."""
     from app.api.search import get_cache_service
@@ -104,7 +104,7 @@ class CacheMetricsResponse(BaseModel):
     used_memory_human: str
 
 
-@router.get("/monitoring/cache", response_model=CacheMetricsResponse)
+@router.get("/monitoring/cache", response_model=CacheMetricsResponse, summary="캐시 메트릭 조회")
 async def get_cache_metrics(_admin: User = Depends(require_admin)):
     """캐시 메트릭 조회."""
     from app.api.search import get_cache_service
@@ -128,7 +128,7 @@ async def get_cache_metrics(_admin: User = Depends(require_admin)):
     )
 
 
-@router.delete("/monitoring/cache")
+@router.delete("/monitoring/cache", summary="캐시 수동 비우기")
 async def clear_cache(_admin: User = Depends(require_admin)):
     """관리자 수동 캐시 비우기."""
     from app.api.search import get_cache_service
@@ -144,7 +144,7 @@ async def clear_cache(_admin: User = Depends(require_admin)):
 # --- Traces (Langfuse 프록시) ---
 
 
-@router.get("/monitoring/traces", response_model=TraceListResponse)
+@router.get("/monitoring/traces", response_model=TraceListResponse, summary="Langfuse 트레이스 목록")
 async def list_traces(_admin: User = Depends(require_admin)):
     """Langfuse 트레이스 목록을 프록시한다."""
     traces = await _langfuse_api_get("/api/public/traces", params={"limit": 50})
@@ -155,7 +155,7 @@ async def list_traces(_admin: User = Depends(require_admin)):
     return TraceListResponse(items=items, total=len(items))
 
 
-@router.get("/monitoring/traces/{trace_id}")
+@router.get("/monitoring/traces/{trace_id}", summary="Langfuse 트레이스 상세")
 async def get_trace(trace_id: str, _admin: User = Depends(require_admin)):
     """Langfuse 트레이스 상세를 프록시한다."""
     trace = await _langfuse_api_get(f"/api/public/traces/{trace_id}")
@@ -167,7 +167,7 @@ async def get_trace(trace_id: str, _admin: User = Depends(require_admin)):
 # --- Costs ---
 
 
-@router.get("/monitoring/costs", response_model=CostResponse)
+@router.get("/monitoring/costs", response_model=CostResponse, summary="비용 추적 정보")
 async def get_costs(_admin: User = Depends(require_admin)):
     """비용 추적 정보를 반환한다."""
     # Langfuse 미연동 시 기본값

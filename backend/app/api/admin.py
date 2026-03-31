@@ -42,7 +42,7 @@ class AdminUserResponse(BaseModel):
 # --- Endpoints ---
 
 
-@router.get("/users")
+@router.get("/users", summary="사용자 목록 조회")
 async def list_users(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -60,7 +60,13 @@ async def list_users(
     }
 
 
-@router.post("/users", status_code=201, response_model=AdminUserResponse)
+@router.post(
+    "/users",
+    status_code=201,
+    response_model=AdminUserResponse,
+    summary="사용자 생성",
+    responses={409: {"description": "이미 등록된 아이디"}, 422: {"description": "비밀번호 정책 미충족"}},
+)
 async def create_user(
     body: AdminCreateUserRequest,
     db: AsyncSession = Depends(get_db),
@@ -94,7 +100,12 @@ async def create_user(
     return _user_to_response(user)
 
 
-@router.put("/users/{user_id}", response_model=AdminUserResponse)
+@router.put(
+    "/users/{user_id}",
+    response_model=AdminUserResponse,
+    summary="사용자 정보 수정",
+    responses={404: {"description": "사용자를 찾을 수 없음"}},
+)
 async def update_user(
     user_id: int,
     body: AdminUpdateUserRequest,
@@ -123,7 +134,11 @@ async def update_user(
     return _user_to_response(user)
 
 
-@router.delete("/users/{user_id}")
+@router.delete(
+    "/users/{user_id}",
+    summary="사용자 삭제",
+    responses={400: {"description": "자기 자신 삭제 불가"}, 404: {"description": "사용자를 찾을 수 없음"}},
+)
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),

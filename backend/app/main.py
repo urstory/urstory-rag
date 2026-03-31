@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func, select
 
 from app.api import documents, evaluation, health, monitoring, search, settings, system, watcher
-from app.api import admin, auth
+from app.api import admin, auth, keys, openai_compat
 from app.config import get_settings
 from app.exceptions import RAGException
 from app.logging_config import setup_logging
@@ -293,3 +293,7 @@ app.include_router(monitoring.router, prefix="/api")
 
 # 관리자 전용 라우터
 app.include_router(admin.router, prefix="/api")
+app.include_router(keys.router, prefix="/api")
+
+# OpenAI 호환 API (/v1/*)
+app.include_router(openai_compat.router)

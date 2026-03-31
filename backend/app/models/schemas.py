@@ -220,6 +220,56 @@ class SettingsUpdateRequest(BaseModel):
     system_prompt: str | None = None
 
 
+# --- API Key ---
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str
+    expires_in_days: int | None = None  # None이면 무기한
+
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [{"name": "사내 포털 연동", "expires_in_days": 90}]
+    })
+
+
+class ApiKeyResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    key_prefix: str
+    is_active: bool
+    expires_at: datetime | None = None
+    last_used_at: datetime | None = None
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(ApiKeyResponse):
+    """발급 시 1회만 반환. key 필드는 다시 조회 불가."""
+    key: str
+
+
+# --- OpenAI 호환 ---
+
+
+class OpenAIChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class OpenAIChatRequest(BaseModel):
+    model: str = "urstory-rag"
+    messages: list[OpenAIChatMessage]
+    stream: bool = False
+    temperature: float | None = None
+
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [{
+            "model": "urstory-rag",
+            "messages": [{"role": "user", "content": "한국의 GDP 성장률은?"}],
+            "stream": False,
+        }]
+    })
+
+
 class TaskStatusResponse(BaseModel):
     id: uuid.UUID
     type: str

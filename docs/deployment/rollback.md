@@ -89,11 +89,11 @@ docker compose run --rm rag-api alembic downgrade <리비전_ID>
 
 ```bash
 # 전체 데이터베이스 백업 (pg_dump)
-docker exec shared-postgres pg_dump -U admin -d shared -F c -f /tmp/backup.dump
+docker exec shared-postgres pg_dump -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c -f /tmp/backup.dump
 docker cp shared-postgres:/tmp/backup.dump ./backup_$(date +%Y%m%d_%H%M%S).dump
 
 # SQL 텍스트 형식 백업
-docker exec shared-postgres pg_dump -U admin -d shared > backup_$(date +%Y%m%d).sql
+docker exec shared-postgres pg_dump -U ${POSTGRES_USER} -d ${POSTGRES_DB} > backup_$(date +%Y%m%d).sql
 ```
 
 ### PostgreSQL 복원
@@ -101,11 +101,11 @@ docker exec shared-postgres pg_dump -U admin -d shared > backup_$(date +%Y%m%d).
 ```bash
 # 커스텀 형식 복원
 docker cp backup.dump shared-postgres:/tmp/backup.dump
-docker exec shared-postgres pg_restore -U admin -d shared --clean --if-exists /tmp/backup.dump
+docker exec shared-postgres pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB} --clean --if-exists /tmp/backup.dump
 
 # SQL 텍스트 형식 복원
 docker cp backup.sql shared-postgres:/tmp/backup.sql
-docker exec shared-postgres psql -U admin -d shared -f /tmp/backup.sql
+docker exec shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f /tmp/backup.sql
 ```
 
 ### 자동 백업 스케줄 (cron)
@@ -113,7 +113,7 @@ docker exec shared-postgres psql -U admin -d shared -f /tmp/backup.sql
 ```bash
 # crontab -e
 # 매일 새벽 3시 백업, 7일 보관
-0 3 * * * docker exec shared-postgres pg_dump -U admin -d shared -F c -f /tmp/backup.dump && docker cp shared-postgres:/tmp/backup.dump /backup/rag_$(date +\%Y\%m\%d).dump && find /backup -name "rag_*.dump" -mtime +7 -delete
+0 3 * * * docker exec shared-postgres pg_dump -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c -f /tmp/backup.dump && docker cp shared-postgres:/tmp/backup.dump /backup/rag_$(date +\%Y\%m\%d).dump && find /backup -name "rag_*.dump" -mtime +7 -delete
 ```
 
 ### Elasticsearch 인덱스 복구
@@ -183,7 +183,7 @@ docker compose -f docker-compose.prod.yml down
 
 # 2. DB 백업에서 복원
 docker cp backup.dump shared-postgres:/tmp/backup.dump
-docker exec shared-postgres pg_restore -U admin -d shared --clean --if-exists /tmp/backup.dump
+docker exec shared-postgres pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB} --clean --if-exists /tmp/backup.dump
 
 # 3. 마이그레이션 상태 확인 후 필요시 재실행
 docker compose run --rm rag-api alembic current
@@ -207,7 +207,7 @@ docker compose -f docker-compose.prod.yml down
 docker compose down  # Langfuse 사용 시
 
 # 2. DB 백업
-docker exec shared-postgres pg_dump -U admin -d shared -F c -f /tmp/backup.dump
+docker exec shared-postgres pg_dump -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c -f /tmp/backup.dump
 docker cp shared-postgres:/tmp/backup.dump ./backup.dump
 
 # 3. 환경변수 파일 백업
@@ -224,7 +224,7 @@ cd infra && docker compose up -d
 
 # 6. DB 복원
 docker cp backup.dump shared-postgres:/tmp/backup.dump
-docker exec shared-postgres pg_restore -U admin -d shared -F c /tmp/backup.dump
+docker exec shared-postgres pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c /tmp/backup.dump
 
 # 7. 앱 배포
 docker compose -f docker-compose.prod.yml up -d

@@ -83,7 +83,7 @@ docker inspect --format='{{.State.Health.Status}}' rag-api
 docker exec -it rag-api /bin/bash
 
 # PostgreSQL 클라이언트
-docker exec -it shared-postgres psql -U admin -d shared
+docker exec -it shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
 
 # Elasticsearch
 docker exec -it shared-elasticsearch bash
@@ -113,13 +113,13 @@ docker exec rag-api curl -s http://shared-elasticsearch:9200 || echo "연결 실
 
 ```bash
 # PostgreSQL 프로세스 확인
-docker exec shared-postgres pg_isready -U admin
+docker exec shared-postgres pg_isready -U ${POSTGRES_USER}
 
 # 연결 수 확인
-docker exec shared-postgres psql -U admin -d shared -c "SELECT count(*) FROM pg_stat_activity;"
+docker exec shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "SELECT count(*) FROM pg_stat_activity;"
 
 # 최대 연결 수 확인
-docker exec shared-postgres psql -U admin -d shared -c "SHOW max_connections;"
+docker exec shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "SHOW max_connections;"
 ```
 
 **해결:**
@@ -132,7 +132,7 @@ docker exec shared-postgres psql -U admin -d shared -c "SHOW max_connections;"
 **증상:** `extension "vector" is not available`
 
 ```bash
-docker exec shared-postgres psql -U admin -d shared -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker exec shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 ### 마이그레이션 실패
@@ -155,7 +155,7 @@ docker compose run --rm rag-api alembic upgrade head
 
 ```bash
 # 테이블 크기 확인
-docker exec shared-postgres psql -U admin -d shared -c "
+docker exec shared-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "
 SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
 FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 "
@@ -273,7 +273,7 @@ docker exec rag-api env | sort
 curl -s http://localhost:8000/api/health | jq .
 
 # 커넥션 풀 상태 확인
-curl -s http://localhost:8000/api/health | jq '.pool_stats'
+curl -s http://localhost:8000/api/health | jq '.connection_pools'
 ```
 
 **주요 원인:**

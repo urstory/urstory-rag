@@ -46,7 +46,7 @@ dependencies = [
     "ragas>=0.2,<1",
 
     # 모니터링
-    "langfuse>=2.55,<3",
+    "langfuse>=2.55,<4",
 
     # NLP
     "nltk>=3.9.1,<4",

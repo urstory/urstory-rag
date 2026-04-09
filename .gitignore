@@ -53,6 +53,7 @@ uploads/
 # 개발 doc (docs/architecture/ 만 공개, 나머지는 무시)
 docs/*
 !docs/architecture/
+!docs/deployment/
 !docs/images/
 !docs/rag_quality_test_report_public_*.md
 !docs/development_summary.md

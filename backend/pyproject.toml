@@ -63,7 +63,7 @@ dependencies = [
 
     # 인증
     "bcrypt>=4.0,<5",
-    "PyJWT>=2.8,<3",
+    "PyJWT>=2.12.1,<3",
     "email-validator>=2.0,<3",
 
     # Rate Limiting

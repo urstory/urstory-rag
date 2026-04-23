@@ -91,7 +91,9 @@ jobs:
       - name: Security audit (pip-audit)
         run: |
           pip install pip-audit
-          pip-audit --strict --desc
+          # --skip-editable: 프로젝트 자체(urstory-rag, editable 설치)는 PyPI에
+          # 없으므로 --strict 조합에서 audit 실패를 유발한다. 의존성만 검사한다.
+          pip-audit --strict --desc --skip-editable
 
   frontend-build:
     runs-on: ubuntu-latest

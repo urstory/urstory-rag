@@ -30,8 +30,12 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      # Register the snapshot directory as a repository path so scripts/backup.sh
+      # can create snapshots via the fs repository type.
+      - path.repo=/usr/share/elasticsearch/snapshots
     volumes:
       - es_data:/usr/share/elasticsearch/data
+      - es_snapshots:/usr/share/elasticsearch/snapshots
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -60,6 +64,7 @@ services:
 volumes:
   pg_data:
   es_data:
+  es_snapshots:
   redis_data:
 
 networks:

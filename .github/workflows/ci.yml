@@ -76,8 +76,17 @@ jobs:
       - name: Run migrations
         run: alembic upgrade head
 
-      - name: Run tests
-        run: pytest --tb=short -q -x
+      - name: Run tests with coverage
+        run: pytest --tb=short -q -x --cov=app --cov-report=term --cov-report=xml
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Security audit (pip-audit)
         run: |

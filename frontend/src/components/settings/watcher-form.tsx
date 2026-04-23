@@ -26,6 +26,7 @@ import {
   useStopWatcher,
   useScanWatcher,
 } from "@/lib/queries";
+import { LoadingState, ErrorState } from "@/components/error/state";
 import type { RAGSettings } from "@/types";
 import { toast } from "sonner";
 import { Save, Plus, Trash2, Play, Square, RefreshCw } from "lucide-react";
@@ -42,7 +43,7 @@ const watcherSchema = z.object({
 type WatcherFormData = z.infer<typeof watcherSchema>;
 
 export function WatcherForm() {
-  const { data: settings, isLoading, isError } = useSettings();
+  const { data: settings, isLoading, isError, error } = useSettings();
   const updateMutation = useUpdateSettings();
   const { data: watcherStatus } = useWatcherStatus();
   const startMutation = useStartWatcher();
@@ -97,8 +98,8 @@ export function WatcherForm() {
     }
   };
 
-  if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
-  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState error={error} />;
 
   const usePolling = form.watch("use_polling");
   const pollingInterval = form.watch("polling_interval");

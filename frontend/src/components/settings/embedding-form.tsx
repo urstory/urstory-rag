@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSettings, useUpdateSettings } from "@/lib/queries";
+import { LoadingState, ErrorState } from "@/components/error/state";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -26,7 +27,7 @@ const embeddingSchema = z.object({
 type EmbeddingFormData = z.infer<typeof embeddingSchema>;
 
 export function EmbeddingForm() {
-  const { data: settings, isLoading, isError } = useSettings();
+  const { data: settings, isLoading, isError, error } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<EmbeddingFormData>({
@@ -49,8 +50,8 @@ export function EmbeddingForm() {
     }
   };
 
-  if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
-  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState error={error} />;
 
   return (
     <Card>

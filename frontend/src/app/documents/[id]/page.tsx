@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { ChunkViewer } from "@/components/documents/chunk-viewer";
 import { IndexingStatus } from "@/components/documents/indexing-status";
 import { useDocument, useDocumentChunks, useReindexDocument } from "@/lib/queries";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { LoadingState, ErrorState, EmptyState } from "@/components/error/state";
+import { ArrowLeft, RefreshCw, FileX } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DocumentDetailPage({
@@ -18,7 +19,13 @@ export default function DocumentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { data: doc, isLoading: docLoading } = useDocument(id);
+  const {
+    data: doc,
+    isLoading: docLoading,
+    isError: docError,
+    error: docErrorObj,
+    refetch: refetchDoc,
+  } = useDocument(id);
   const { data: chunks, isLoading: chunksLoading } = useDocumentChunks(id);
   const reindexMutation = useReindexDocument();
 
@@ -37,12 +44,16 @@ export default function DocumentDetailPage({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  if (docLoading) {
-    return <p className="text-muted-foreground">로딩 중...</p>;
-  }
-
+  if (docLoading) return <LoadingState label="문서를 불러오는 중..." />;
+  if (docError) return <ErrorState error={docErrorObj} retry={() => refetchDoc()} />;
   if (!doc) {
-    return <p className="text-muted-foreground">문서를 찾을 수 없습니다.</p>;
+    return (
+      <EmptyState
+        title="문서를 찾을 수 없습니다"
+        description="삭제되었거나 접근 권한이 없을 수 있습니다."
+        icon={<FileX className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
+      />
+    );
   }
 
   return (

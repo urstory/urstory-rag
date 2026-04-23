@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ErrorBoundary } from "@/components/error/error-boundary";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           tabIndex={-1}
           className="flex-1 overflow-auto p-4 md:p-6 focus:outline-none"
         >
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
     </div>

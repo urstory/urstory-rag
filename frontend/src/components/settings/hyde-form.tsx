@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useSettings, useUpdateSettings } from "@/lib/queries";
+import { LoadingState, ErrorState } from "@/components/error/state";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -20,7 +21,7 @@ const hydeSchema = z.object({
 type HyDEFormData = z.infer<typeof hydeSchema>;
 
 export function HyDEForm() {
-  const { data: settings, isLoading, isError } = useSettings();
+  const { data: settings, isLoading, isError, error } = useSettings();
   const updateMutation = useUpdateSettings();
 
   const form = useForm<HyDEFormData>({
@@ -43,8 +44,8 @@ export function HyDEForm() {
     }
   };
 
-  if (isLoading) return <p className="text-muted-foreground">로딩 중...</p>;
-  if (isError) return <p className="text-destructive">설정을 불러올 수 없습니다.</p>;
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState error={error} />;
 
   return (
     <Card>

@@ -50,6 +50,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **Rate Limiting** | slowapi 기반 엔드포인트별 요청 제한 (로그인 5/min, 검색 30/min) |
 | **CORS 화이트리스트** | 환경변수 기반 허용 오리진 관리 (`allow_origins=["*"]` 제거) |
 | **접근성(a11y)** | ARIA 레이블/역할, 키보드 포커스 링, Skip-link, 에러 라이브 리전 적용. `eslint-plugin-jsx-a11y` 규칙으로 CI 자동 검증 |
+| **Error Boundary + 통합 상태 컴포넌트** | 글로벌/페이지/컴포넌트 3-tier Error Boundary, `LoadingState`/`EmptyState`/`ErrorState` 통합 컴포넌트. 401/403/404/429/5xx/네트워크 오류별 친절한 메시지와 재시도 |
 
 ---
 

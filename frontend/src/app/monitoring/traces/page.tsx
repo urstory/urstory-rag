@@ -109,8 +109,8 @@ export default function TracesPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/monitoring">
-            <ArrowLeft className="h-4 w-4" />
+          <Link href="/monitoring" aria-label="모니터링으로 돌아가기">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Button>
         <h2 className="text-2xl font-bold">트레이스</h2>

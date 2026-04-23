@@ -175,8 +175,9 @@ export default function UsersPage() {
                             size="icon"
                             onClick={() => openEdit(u)}
                             title="수정"
+                            aria-label={`사용자 ${u.username} 수정`}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
                           </Button>
                           {u.id !== currentUser?.id && (
                             <Button
@@ -184,9 +185,10 @@ export default function UsersPage() {
                               size="icon"
                               onClick={() => setDeleteTarget(u)}
                               title="삭제"
+                              aria-label={`사용자 ${u.username} 삭제`}
                               className="text-destructive hover:text-destructive"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
                             </Button>
                           )}
                         </div>

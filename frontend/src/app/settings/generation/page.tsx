@@ -10,8 +10,8 @@ export default function GenerationSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/settings">
-            <ArrowLeft className="h-4 w-4" />
+          <Link href="/settings" aria-label="설정 목록으로 돌아가기">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Button>
         <h2 className="text-2xl font-bold">답변 생성 설정</h2>

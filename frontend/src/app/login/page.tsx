@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
@@ -37,29 +38,44 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground">관리자 콘솔에 로그인하세요</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="username">아이디</Label>
               <Input
+                id="username"
                 type="text"
                 placeholder="아이디"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 autoComplete="username"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? "login-error" : undefined}
               />
             </div>
-            <div>
+            <div className="space-y-2">
+              <Label htmlFor="password">비밀번호</Label>
               <Input
+                id="password"
                 type="password"
                 placeholder="비밀번호"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? "login-error" : undefined}
               />
             </div>
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p
+                id="login-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-sm text-destructive"
+              >
+                {error}
+              </p>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "로그인 중..." : "로그인"}

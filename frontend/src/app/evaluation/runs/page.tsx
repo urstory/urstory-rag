@@ -162,8 +162,8 @@ export default function RunsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/evaluation">
-            <ArrowLeft className="h-4 w-4" />
+          <Link href="/evaluation" aria-label="평가로 돌아가기">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Button>
         <h2 className="text-2xl font-bold">평가 실행</h2>

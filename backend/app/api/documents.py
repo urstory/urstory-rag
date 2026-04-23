@@ -26,6 +26,19 @@ async def _invalidate_document_caches() -> None:
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
 
+def _parse_doc_id(doc_id: str) -> uuid.UUID:
+    """Parse a document UUID path param, raising 404 when malformed.
+
+    FastAPI path params accept any string, so a non-UUID value would otherwise
+    raise ValueError and surface as HTTP 500. Treat those as "not found" to
+    keep the API surface clean.
+    """
+    try:
+        return uuid.UUID(doc_id)
+    except (ValueError, TypeError) as exc:
+        raise DocumentNotFoundError(f"Document {doc_id} not found") from exc
+
+
 @router.get("/documents", summary="문서 목록 조회", description="페이징, 정렬, 소스 필터 지원.")
 async def list_documents(
     page: int = Query(1, ge=1),
@@ -129,7 +142,7 @@ async def upload_document(
 )
 async def get_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 상세."""
-    doc = await db.get(Document, uuid.UUID(doc_id))
+    doc = await db.get(Document, _parse_doc_id(doc_id))
     if not doc:
         raise DocumentNotFoundError(f"Document {doc_id} not found")
     return _doc_to_dict(doc)
@@ -143,7 +156,7 @@ async def get_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: 
 )
 async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """문서 삭제."""
-    doc = await db.get(Document, uuid.UUID(doc_id))
+    doc = await db.get(Document, _parse_doc_id(doc_id))
     if not doc:
         raise DocumentNotFoundError(f"Document {doc_id} not found")
 
@@ -164,7 +177,7 @@ async def delete_document(doc_id: str, db: AsyncSession = Depends(get_db), _admi
 )
 async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """단일 문서 재인덱싱."""
-    doc = await db.get(Document, uuid.UUID(doc_id))
+    doc = await db.get(Document, _parse_doc_id(doc_id))
     if not doc:
         raise DocumentNotFoundError(f"Document {doc_id} not found")
 
@@ -185,7 +198,7 @@ async def reindex_document(doc_id: str, db: AsyncSession = Depends(get_db), _adm
 )
 async def get_document_chunks(doc_id: str, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """청크 목록."""
-    doc = await db.get(Document, uuid.UUID(doc_id))
+    doc = await db.get(Document, _parse_doc_id(doc_id))
     if not doc:
         raise DocumentNotFoundError(f"Document {doc_id} not found")
 

@@ -48,6 +48,18 @@ _admin_user = _FakeUser(id=1, username="testadmin", name="테스트 관리자", 
 _regular_user = _FakeUser(id=2, username="testuser", name="테스트 사용자", role="user")
 
 
+@pytest.fixture
+def admin_user():
+    """Reusable admin test user. Share across unit tests to avoid ad-hoc dicts."""
+    return _admin_user
+
+
+@pytest.fixture
+def regular_user():
+    """Reusable non-admin test user."""
+    return _regular_user
+
+
 @pytest_asyncio.fixture
 async def test_db():
     """PostgreSQL 테스트 DB 세션. 테스트 후 롤백."""

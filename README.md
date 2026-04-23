@@ -53,6 +53,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **Error Boundary + 통합 상태 컴포넌트** | 글로벌/페이지/컴포넌트 3-tier Error Boundary, `LoadingState`/`EmptyState`/`ErrorState` 통합 컴포넌트. 401/403/404/429/5xx/네트워크 오류별 친절한 메시지와 재시도 |
 | **백업/복구 자동화** | `scripts/backup.sh`로 PostgreSQL `pg_dump` + Elasticsearch 스냅샷. `scripts/restore.sh`로 상호 복원. `scripts/test-restore.sh`로 월 1회 복원 검증. 보관 정책 7일/30일, RTO/RPO 1시간 목표. 상세: `docs/deployment/backup_and_recovery.md` |
 | **E2E 테스트 확대** | Playwright 8 스위트(auth/documents/search/search-flow/settings/error-states/a11y/responsive). `fixtures/auth.ts`로 시드 관리자 로그인 자동화, `page.route`로 5xx/네트워크/401/404 시나리오 mock |
+| **백엔드 커버리지 게이트** | pytest-cov 설정, 단위 테스트 기준 **78%** 측정, CI에서 **75% 미만 시 실패**. 엣지 케이스(빈/긴 쿼리, 비-UUID, 만료 키, 비활성 유저) 추가. XML 리포트 아티팩트 업로드 |
 
 ---
 

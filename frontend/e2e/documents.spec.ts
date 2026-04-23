@@ -1,8 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/auth";
 import path from "path";
 
 test.describe("문서 관리", () => {
-  test("문서 업로드 및 목록 확인", async ({ page }) => {
+  test("문서 업로드 및 목록 확인", async ({ authedPage: page }) => {
     await page.goto("/documents");
 
     // 업로드 버튼 클릭
@@ -32,7 +32,7 @@ test.describe("문서 관리", () => {
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test("문서 삭제", async ({ page }) => {
+  test("문서 삭제", async ({ authedPage: page }) => {
     await page.goto("/documents");
 
     // 문서가 있는 경우에만 삭제 테스트
@@ -57,17 +57,19 @@ test.describe("문서 관리", () => {
     }
   });
 
-  test("문서 목록 페이지네이션", async ({ page }) => {
+  test("문서 목록 페이지네이션", async ({ authedPage: page }) => {
     await page.goto("/documents");
 
     // 목록 테이블 표시 확인
-    await expect(page.getByText("파일명").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("파일명").first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // 필터 드롭다운 확인
     await expect(page.getByText("전체").first()).toBeVisible();
   });
 
-  test("문서 상세 페이지 접근", async ({ page }) => {
+  test("문서 상세 페이지 접근", async ({ authedPage: page }) => {
     await page.goto("/documents");
 
     // 문서가 있으면 상세 페이지로 이동
@@ -78,5 +80,27 @@ test.describe("문서 관리", () => {
       await viewButtons.first().click();
       await page.waitForURL(/\/documents\/.+/);
     }
+  });
+
+  test("업로드 다이얼로그의 파일 input이 label과 연결되어 있음", async ({
+    authedPage: page,
+  }) => {
+    await page.goto("/documents");
+    await page.getByRole("button", { name: /업로드/ }).click();
+    // a11y: file input has id="document-upload-file", and the caption label
+    // is associated via htmlFor (#20).
+    const input = page.locator("#document-upload-file");
+    await expect(input).toBeAttached();
+    const ariaLabel = await input.getAttribute("aria-label");
+    expect(ariaLabel).toBeTruthy();
+  });
+
+  test("다이얼로그 Escape 키로 닫기", async ({ authedPage: page }) => {
+    await page.goto("/documents");
+    await page.getByRole("button", { name: /업로드/ }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).not.toBeVisible();
   });
 });

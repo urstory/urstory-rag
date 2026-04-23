@@ -52,6 +52,7 @@ UrstoryRAG는 **한국어에 최적화된 프로덕션 레벨 RAG(Retrieval-Augm
 | **접근성(a11y)** | ARIA 레이블/역할, 키보드 포커스 링, Skip-link, 에러 라이브 리전 적용. `eslint-plugin-jsx-a11y` 규칙으로 CI 자동 검증 |
 | **Error Boundary + 통합 상태 컴포넌트** | 글로벌/페이지/컴포넌트 3-tier Error Boundary, `LoadingState`/`EmptyState`/`ErrorState` 통합 컴포넌트. 401/403/404/429/5xx/네트워크 오류별 친절한 메시지와 재시도 |
 | **백업/복구 자동화** | `scripts/backup.sh`로 PostgreSQL `pg_dump` + Elasticsearch 스냅샷. `scripts/restore.sh`로 상호 복원. `scripts/test-restore.sh`로 월 1회 복원 검증. 보관 정책 7일/30일, RTO/RPO 1시간 목표. 상세: `docs/deployment/backup_and_recovery.md` |
+| **E2E 테스트 확대** | Playwright 8 스위트(auth/documents/search/search-flow/settings/error-states/a11y/responsive). `fixtures/auth.ts`로 시드 관리자 로그인 자동화, `page.route`로 5xx/네트워크/401/404 시나리오 mock |
 
 ---
 

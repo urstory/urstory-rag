@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/auth";
 
 test.describe("설정", () => {
-  test("설정 카테고리 목록 표시", async ({ page }) => {
+  test("설정 카테고리 목록 표시", async ({ authedPage: page }) => {
     await page.goto("/settings");
 
     // 페이지 타이틀
@@ -18,7 +18,7 @@ test.describe("설정", () => {
     await expect(page.getByText("디렉토리 감시")).toBeVisible();
   });
 
-  test("가드레일 ON/OFF 토글", async ({ page }) => {
+  test("가드레일 ON/OFF 토글", async ({ authedPage: page }) => {
     await page.goto("/settings/guardrails");
 
     // 페이지 타이틀
@@ -39,7 +39,7 @@ test.describe("설정", () => {
     ).toBeVisible();
   });
 
-  test("검색 설정 변경", async ({ page }) => {
+  test("검색 설정 변경", async ({ authedPage: page }) => {
     await page.goto("/settings/search");
 
     // 페이지 타이틀
@@ -63,17 +63,21 @@ test.describe("설정", () => {
     ).toBeVisible();
   });
 
-  test("설정 페이지에서 뒤로가기", async ({ page }) => {
+  test("설정 페이지에서 뒤로가기 — aria-label 링크", async ({
+    authedPage: page,
+  }) => {
     await page.goto("/settings/guardrails");
 
-    // 뒤로가기 버튼 클릭
-    await page.getByRole("link", { name: /설정/ }).first().click();
+    // a11y: back button now has aria-label (#20)
+    await page
+      .getByRole("link", { name: "설정 목록으로 돌아가기" })
+      .click();
 
     // 설정 메인 페이지로 이동 확인
     await expect(page.getByText("청킹")).toBeVisible();
   });
 
-  test("청킹 설정 페이지", async ({ page }) => {
+  test("청킹 설정 페이지", async ({ authedPage: page }) => {
     await page.goto("/settings/chunking");
 
     await expect(
@@ -81,7 +85,7 @@ test.describe("설정", () => {
     ).toBeVisible();
   });
 
-  test("임베딩 설정 페이지", async ({ page }) => {
+  test("임베딩 설정 페이지", async ({ authedPage: page }) => {
     await page.goto("/settings/embedding");
 
     await expect(
@@ -89,7 +93,7 @@ test.describe("설정", () => {
     ).toBeVisible();
   });
 
-  test("HyDE 설정 페이지", async ({ page }) => {
+  test("HyDE 설정 페이지", async ({ authedPage: page }) => {
     await page.goto("/settings/hyde");
 
     await expect(
@@ -97,11 +101,25 @@ test.describe("설정", () => {
     ).toBeVisible();
   });
 
-  test("답변 생성 설정 페이지", async ({ page }) => {
+  test("답변 생성 설정 페이지", async ({ authedPage: page }) => {
     await page.goto("/settings/generation");
 
     await expect(
       page.getByRole("button", { name: /저장/ })
     ).toBeVisible();
+  });
+
+  test("설정 API 실패 시 ErrorState 노출", async ({ authedPage: page }) => {
+    await page.route("**/api/settings", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "service unavailable" }),
+      })
+    );
+    await page.goto("/settings/chunking");
+    await expect(page.locator("[role='alert']")).toBeVisible({
+      timeout: 10000,
+    });
   });
 });

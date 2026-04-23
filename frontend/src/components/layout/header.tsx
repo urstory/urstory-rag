@@ -53,24 +53,35 @@ export function Header({ onMenuToggle }: HeaderProps) {
           size="icon"
           className="md:hidden"
           onClick={onMenuToggle}
+          aria-label="메뉴 열기"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-5 w-5" aria-hidden="true" />
         </Button>
         <span className="text-sm font-medium md:hidden">UrstoryRAG</span>
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          role="status"
+          aria-live="polite"
+          aria-label={`시스템 상태: ${statusLabel}`}
+        >
           <span className="text-xs text-muted-foreground">시스템 상태</span>
           <Badge variant="outline" className="gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${statusColor}`} />
+            <span className={`h-2 w-2 rounded-full ${statusColor}`} aria-hidden="true" />
             {statusLabel}
           </Badge>
         </div>
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <User className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                aria-label={`사용자 메뉴: ${user.name}`}
+              >
+                <User className="h-4 w-4" aria-hidden="true" />
                 <span className="text-xs">
                   {user.name}
                 </span>
@@ -87,13 +98,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/settings/profile" className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
                   프로필 설정
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
                 로그아웃
               </DropdownMenuItem>
             </DropdownMenuContent>

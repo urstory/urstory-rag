@@ -82,11 +82,11 @@ export default function ApiKeysPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/settings" aria-label="설정 목록으로 돌아가기">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">API Key 관리</h1>
           <p className="text-muted-foreground text-sm">
@@ -164,8 +164,9 @@ export default function ApiKeysPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteTarget(k.id)}
+                            aria-label={`API Key "${k.name}" 폐기`}
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
                           </Button>
                         )}
                       </td>
@@ -251,8 +252,17 @@ print(response.choices[0].message.content)`}
           <div className="space-y-4">
             <div className="bg-muted p-3 rounded-lg flex items-center gap-2">
               <code className="flex-1 text-sm break-all">{createdKey}</code>
-              <Button size="icon" variant="ghost" onClick={handleCopy}>
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleCopy}
+                aria-label={copied ? "복사 완료" : "API Key 복사"}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                )}
               </Button>
             </div>
             <p className="text-sm text-destructive font-medium">

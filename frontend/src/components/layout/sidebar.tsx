@@ -30,7 +30,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex flex-col gap-1 px-3 py-4">
+    <nav className="flex flex-col gap-1 px-3 py-4" aria-label="주 메뉴">
       <div className="mb-4 px-3">
         <h1 className="text-lg font-bold">UrstoryRAG</h1>
         <p className="text-xs text-muted-foreground">관리자 콘솔</p>
@@ -43,14 +43,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             key={item.href}
             href={item.href}
             onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4" aria-hidden="true" />
             {item.label}
           </Link>
         );

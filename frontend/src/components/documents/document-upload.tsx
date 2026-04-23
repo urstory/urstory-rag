@@ -64,7 +64,7 @@ export function DocumentUpload() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Upload className="mr-2 h-4 w-4" />
+          <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
           업로드
         </Button>
       </DialogTrigger>
@@ -80,20 +80,23 @@ export function DocumentUpload() {
             className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
               dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
             }`}
+            aria-label="파일 드롭 영역"
           >
-            <FileUp className="mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
+            <FileUp className="mb-2 h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            <label htmlFor="document-upload-file" className="text-sm text-muted-foreground">
               파일을 드래그하여 놓거나 클릭하여 선택
-            </p>
+            </label>
             <p className="mt-1 text-xs text-muted-foreground">
               PDF, DOCX, TXT, MD 지원
             </p>
             <input
+              id="document-upload-file"
               type="file"
               accept=".pdf,.docx,.txt,.md"
               className="absolute inset-0 cursor-pointer opacity-0"
               onChange={handleFileSelect}
               style={{ position: "relative", marginTop: "8px", width: "auto" }}
+              aria-label="업로드할 파일 선택"
             />
           </div>
           {selectedFile && (
@@ -108,13 +111,18 @@ export function DocumentUpload() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSelectedFile(null)}
+                aria-label={`선택된 파일 ${selectedFile.name} 제거`}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           )}
           {uploadMutation.isPending && (
-            <Progress value={50} className="w-full" />
+            <Progress
+              value={50}
+              className="w-full"
+              aria-label="문서 업로드 진행률"
+            />
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>

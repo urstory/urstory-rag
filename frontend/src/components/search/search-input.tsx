@@ -42,26 +42,39 @@ export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+      role="search"
+      aria-label="RAG 검색"
+    >
       <div className="flex gap-2">
+        <Label htmlFor="search-query" className="sr-only">
+          검색 쿼리
+        </Label>
         <Input
+          id="search-query"
           placeholder="검색 쿼리를 입력하세요..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1"
         />
         <Button type="submit" disabled={isLoading || !query.trim()}>
-          <Search className="mr-2 h-4 w-4" />
+          <Search className="mr-2 h-4 w-4" aria-hidden="true" />
           {isLoading ? "검색 중..." : "검색"}
         </Button>
       </div>
 
       {/* Search options */}
-      <div className="grid gap-4 rounded-md border p-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className="grid gap-4 rounded-md border p-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        role="group"
+        aria-label="검색 옵션"
+      >
         <div className="space-y-2">
-          <Label>검색 모드</Label>
+          <Label htmlFor="search-mode">검색 모드</Label>
           <Select value={searchMode} onValueChange={(v) => setSearchMode(v as typeof searchMode)}>
-            <SelectTrigger>
+            <SelectTrigger id="search-mode" aria-label="검색 모드 선택">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -74,23 +87,35 @@ export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
         </div>
 
         <div className="flex items-center justify-between space-y-0 sm:flex-col sm:items-start sm:space-y-2">
-          <Label>HyDE</Label>
-          <Switch checked={useHyde} onCheckedChange={setUseHyde} />
+          <Label htmlFor="search-hyde">HyDE</Label>
+          <Switch
+            id="search-hyde"
+            checked={useHyde}
+            onCheckedChange={setUseHyde}
+            aria-label="HyDE 사용"
+          />
         </div>
 
         <div className="flex items-center justify-between space-y-0 sm:flex-col sm:items-start sm:space-y-2">
-          <Label>리랭킹</Label>
-          <Switch checked={useReranking} onCheckedChange={setUseReranking} />
+          <Label htmlFor="search-reranking">리랭킹</Label>
+          <Switch
+            id="search-reranking"
+            checked={useReranking}
+            onCheckedChange={setUseReranking}
+            aria-label="리랭킹 사용"
+          />
         </div>
 
         <div className="space-y-2">
-          <Label>Top-K: {topK}</Label>
+          <Label htmlFor="search-topk">Top-K: {topK}</Label>
           <Slider
+            id="search-topk"
             value={[topK]}
             onValueChange={(v) => setTopK(v[0])}
             min={1}
             max={20}
             step={1}
+            aria-label={`Top-K (현재 ${topK})`}
           />
         </div>
       </div>

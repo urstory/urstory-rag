@@ -18,9 +18,9 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html>
+    <html lang="ko">
       <body className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <div className="max-w-md text-center space-y-4">
+        <div className="max-w-md text-center space-y-4" role="alert">
           <h2 className="text-xl font-semibold text-gray-900">
             예상치 못한 오류가 발생했습니다
           </h2>

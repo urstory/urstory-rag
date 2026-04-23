@@ -165,8 +165,11 @@ export function DocumentList() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/documents/${doc.id}`}>
-                          <Eye className="h-4 w-4" />
+                        <Link
+                          href={`/documents/${doc.id}`}
+                          aria-label={`${doc.filename} 상세 보기`}
+                        >
+                          <Eye className="h-4 w-4" aria-hidden="true" />
                         </Link>
                       </Button>
                       <Button
@@ -174,15 +177,17 @@ export function DocumentList() {
                         size="icon"
                         onClick={() => handleReindex(doc.id)}
                         disabled={reindexMutation.isPending}
+                        aria-label={`${doc.filename} 재인덱싱`}
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeleteId(doc.id)}
+                        aria-label={`${doc.filename} 삭제`}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </div>
                   </TableCell>

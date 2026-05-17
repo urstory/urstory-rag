@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: backend/coverage.xml
@@ -168,7 +168,7 @@ jobs:
             ghcr.io/urstory/urstory-rag-frontend:${{ steps.tags.outputs.sha_tag }}
 
       - name: Trivy scan (Backend image)
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: ghcr.io/urstory/urstory-rag-api:${{ steps.tags.outputs.sha_tag }}
           format: table
@@ -176,7 +176,7 @@ jobs:
           exit-code: 0
 
       - name: Trivy scan (Frontend image)
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: ghcr.io/urstory/urstory-rag-frontend:${{ steps.tags.outputs.sha_tag }}
           format: table
